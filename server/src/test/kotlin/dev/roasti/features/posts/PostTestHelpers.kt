@@ -27,37 +27,37 @@ suspend fun ApplicationTestBuilder.createPost(
     client: HttpClient,
     payload: CreatePostRequestDto = defaultPostPayload,
 ): PostResponseDto {
-    val response =
-        client.post("/api/v1/posts") {
-            contentType(ContentType.Application.Json)
-            setBody(payload)
-        }
-    assertEquals(HttpStatusCode.Created, response.status)
-    return response.body()
+  val response =
+      client.post("/api/v1/posts") {
+        contentType(ContentType.Application.Json)
+        setBody(payload)
+      }
+  assertEquals(HttpStatusCode.Created, response.status)
+  return response.body()
 }
 
 suspend fun ApplicationTestBuilder.getMyId(client: HttpClient): String =
     client.get("/api/v1/users/me").body<UserDto>().id
 
 suspend fun ApplicationTestBuilder.createRecipe(client: HttpClient): RecipeResponseDto {
-    val response =
-        client.post("/api/v1/recipes") {
-            contentType(ContentType.Application.Json)
-            setBody(
-                CreateRecipeRequestDto(
-                    title = "Test Recipe",
-                    description = "Test description",
-                    brewMethod = BrewMethodDto.V60,
-                    difficulty = DifficultyDto.EASY,
-                    roastLevel = RoastLevelDto.LIGHT,
-                    steps = listOf(CreateRecipeStepRequestDto(order = 1, title = "Boil water")),
-                )
+  val response =
+      client.post("/api/v1/recipes") {
+        contentType(ContentType.Application.Json)
+        setBody(
+            CreateRecipeRequestDto(
+                title = "Test Recipe",
+                description = "Test description",
+                brewMethod = BrewMethodDto.V60,
+                difficulty = DifficultyDto.EASY,
+                roastLevel = RoastLevelDto.LIGHT,
+                steps = listOf(CreateRecipeStepRequestDto(order = 1, title = "Boil water")),
             )
-        }
-    assertEquals(HttpStatusCode.Created, response.status)
-    return response.body()
+        )
+      }
+  assertEquals(HttpStatusCode.Created, response.status)
+  return response.body()
 }
 
 suspend fun ApplicationTestBuilder.deleteRecipe(client: HttpClient, recipeId: String) {
-    assertEquals(HttpStatusCode.NoContent, client.delete("/api/v1/recipes/$recipeId").status)
+  assertEquals(HttpStatusCode.NoContent, client.delete("/api/v1/recipes/$recipeId").status)
 }

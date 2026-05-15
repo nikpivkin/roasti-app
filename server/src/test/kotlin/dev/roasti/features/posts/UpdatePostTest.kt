@@ -17,52 +17,52 @@ import kotlin.test.assertEquals
 
 class UpdatePostTest {
 
-    @Test
-    fun `update post - author can update`() = withApp {
-        val client = newAuthenticatedClient()
-        val created = createPost(client)
-        val response =
-            client.put("/api/v1/posts/${created.id}") {
-                contentType(ContentType.Application.Json)
-                setBody(UpdatePostRequestDto(title = "Updated title", text = "Updated text"))
-            }
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("Updated text", response.body<PostResponseDto>().text)
-    }
+  @Test
+  fun `update post - author can update`() = withApp {
+    val client = newAuthenticatedClient()
+    val created = createPost(client)
+    val response =
+        client.put("/api/v1/posts/${created.id}") {
+          contentType(ContentType.Application.Json)
+          setBody(UpdatePostRequestDto(title = "Updated title", text = "Updated text"))
+        }
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals("Updated text", response.body<PostResponseDto>().text)
+  }
 
-    @Test
-    fun `update post - non-author returns 403`() = withApp {
-        val c1 = newAuthenticatedClient()
-        val c2 = newAuthenticatedClient()
-        val created = createPost(c1)
-        val response =
-            c2.put("/api/v1/posts/${created.id}") {
-                contentType(ContentType.Application.Json)
-                setBody(UpdatePostRequestDto(title = "Hijack", text = "hijack"))
-            }
-        assertEquals(HttpStatusCode.Forbidden, response.status)
-    }
+  @Test
+  fun `update post - non-author returns 403`() = withApp {
+    val c1 = newAuthenticatedClient()
+    val c2 = newAuthenticatedClient()
+    val created = createPost(c1)
+    val response =
+        c2.put("/api/v1/posts/${created.id}") {
+          contentType(ContentType.Application.Json)
+          setBody(UpdatePostRequestDto(title = "Hijack", text = "hijack"))
+        }
+    assertEquals(HttpStatusCode.Forbidden, response.status)
+  }
 
-    @Test
-    fun `update post - not found returns 404`() = withApp {
-        val client = newAuthenticatedClient()
-        val response =
-            client.put("/api/v1/posts/${UUID.randomUUID()}") {
-                contentType(ContentType.Application.Json)
-                setBody(UpdatePostRequestDto(title = "X", text = "x"))
-            }
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
+  @Test
+  fun `update post - not found returns 404`() = withApp {
+    val client = newAuthenticatedClient()
+    val response =
+        client.put("/api/v1/posts/${UUID.randomUUID()}") {
+          contentType(ContentType.Application.Json)
+          setBody(UpdatePostRequestDto(title = "X", text = "x"))
+        }
+    assertEquals(HttpStatusCode.NotFound, response.status)
+  }
 
-    @Test
-    fun `update post - unauthenticated returns 401`() = withApp {
-        val client = newAuthenticatedClient()
-        val created = createPost(client)
-        val response =
-            jsonClient().put("/api/v1/posts/${created.id}") {
-                contentType(ContentType.Application.Json)
-                setBody(UpdatePostRequestDto(title = "X", text = "x"))
-            }
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
+  @Test
+  fun `update post - unauthenticated returns 401`() = withApp {
+    val client = newAuthenticatedClient()
+    val created = createPost(client)
+    val response =
+        jsonClient().put("/api/v1/posts/${created.id}") {
+          contentType(ContentType.Application.Json)
+          setBody(UpdatePostRequestDto(title = "X", text = "x"))
+        }
+    assertEquals(HttpStatusCode.Unauthorized, response.status)
+  }
 }
