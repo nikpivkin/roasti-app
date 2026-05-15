@@ -5,11 +5,8 @@ import arrow.core.getOrElse
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import dev.roasti.common.domain.Page
-import dev.roasti.features.comments.Comment
-import dev.roasti.features.comments.CommentId
 import dev.roasti.features.comments.CommentService
 import dev.roasti.features.comments.CommentTargetType
-import dev.roasti.features.comments.CreateCommentError
 import dev.roasti.features.recipes.RecipeService
 import dev.roasti.features.uploads.UploadService
 import dev.roasti.features.users.model.UserId
@@ -57,12 +54,6 @@ sealed interface VotePostError {
   data object PostNotFound : VotePostError
 }
 
-sealed interface CreatePostCommentError {
-  data object PostNotFound : CreatePostCommentError
-
-  data class CommentError(val error: CreateCommentError) : CreatePostCommentError
-}
-
 interface PostService {
   suspend fun getById(postId: PostId, userId: UserId?): Either<GetPostError, Post>
 
@@ -83,13 +74,6 @@ interface PostService {
       postId: PostId,
       direction: VoteDirection,
   ): Either<VotePostError, VoteInfo>
-
-  suspend fun createComment(
-      userId: UserId,
-      postId: PostId,
-      text: String,
-      parentId: CommentId?,
-  ): Either<CreatePostCommentError, Comment>
 }
 
 @OptIn(ExperimentalUuidApi::class)
@@ -130,8 +114,8 @@ class PostServiceImpl(
                 else RecipeRef.Unavailable(recipeId)
               }
           row.toPost(
-              voteInfo = voteInfos.getValue(id),
-              commentsCount = commentCounts.getValue(id),
+              voteInfo = voteInfos.getOrDefault(id, VoteInfo.EMPTY),
+              commentsCount = commentCounts.getOrDefault(id, 0),
               recipeRef = recipeRef,
           )
         }
@@ -201,19 +185,6 @@ class PostServiceImpl(
   ): Either<VotePostError, VoteInfo> = either {
     repo.findById(postId) ?: raise(VotePostError.PostNotFound)
     voteService.toggle(userId, postId.value, VoteTargetType.POST, direction)
-  }
-
-  override suspend fun createComment(
-      userId: UserId,
-      postId: PostId,
-      text: String,
-      parentId: CommentId?,
-  ): Either<CreatePostCommentError, Comment> = either {
-    repo.findById(postId) ?: raise(CreatePostCommentError.PostNotFound)
-    commentService
-        .create(userId, postId.value, CommentTargetType.POST, text, parentId)
-        .mapLeft { CreatePostCommentError.CommentError(it) }
-        .bind()
   }
 
   private suspend fun PostRow.enrich(userId: UserId?): Post {

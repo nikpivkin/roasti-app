@@ -5,11 +5,6 @@ import kotlin.uuid.ExperimentalUuidApi
 import org.jetbrains.exposed.v1.core.dao.id.UuidTable
 import org.jetbrains.exposed.v1.datetime.timestamp
 
-enum class CommentTargetType {
-  POST,
-  RECIPE,
-}
-
 @OptIn(ExperimentalUuidApi::class)
 object CommentTable : UuidTable("comments") {
   val targetId = uuid("target_id")

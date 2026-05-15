@@ -95,6 +95,20 @@ internal fun Comment.toDto() =
 
 fun CreateCommentError.toHttp() =
     when (this) {
+      CreateCommentError.TargetNotFound ->
+          HttpStatusCode.NotFound to ApiError(ApiErrorCode.NOT_FOUND, "Target not found")
+
+      CreateCommentError.TargetNotVisible ->
+          HttpStatusCode.Forbidden to ApiError(ApiErrorCode.FORBIDDEN, "Target not visible")
+
+      CreateCommentError.CommentsDisabled ->
+          HttpStatusCode.UnprocessableEntity to
+              ApiError(ApiErrorCode.INVALID_INPUT, "Comments are disabled for this target")
+
+      CreateCommentError.ParentNotFound ->
+          HttpStatusCode.UnprocessableEntity to
+              ApiError(ApiErrorCode.INVALID_INPUT, "Parent comment not found")
+
       is CreateCommentError.InvalidInput ->
           HttpStatusCode.UnprocessableEntity to ApiError(ApiErrorCode.INVALID_INPUT, message)
     }

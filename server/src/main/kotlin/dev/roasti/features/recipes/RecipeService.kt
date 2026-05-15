@@ -7,12 +7,6 @@ import dev.roasti.common.domain.Page
 import dev.roasti.feature.recipe.domain.model.BrewMethod
 import dev.roasti.feature.recipe.domain.model.Difficulty
 import dev.roasti.feature.recipe.domain.model.RoastLevel
-import dev.roasti.features.comments.Comment
-import dev.roasti.features.comments.CommentId
-import dev.roasti.features.comments.CommentService
-import dev.roasti.features.comments.CommentTargetType
-import dev.roasti.features.comments.CommentThread
-import dev.roasti.features.comments.CreateCommentError
 import dev.roasti.features.likes.LikeInfo
 import dev.roasti.features.likes.LikeService
 import dev.roasti.features.likes.LikeTargetType
@@ -45,16 +39,6 @@ sealed interface UpdateRecipeError {
 
 sealed interface ToggleLikeError {
   data object RecipeNotFound : ToggleLikeError
-}
-
-sealed interface ListRecipeCommentsError {
-  data object RecipeNotFound : ListRecipeCommentsError
-}
-
-sealed interface CreateRecipeCommentError {
-  data object RecipeNotFound : CreateRecipeCommentError
-
-  data class CommentError(val error: CreateCommentError) : CreateRecipeCommentError
 }
 
 sealed interface CloneRecipeError {
@@ -102,19 +86,6 @@ interface RecipeService {
 
   suspend fun toggleLike(userId: UserId, id: RecipeId): Either<ToggleLikeError, LikeInfo>
 
-  suspend fun listComments(
-      id: RecipeId,
-      page: Int,
-      limit: Int,
-  ): Either<ListRecipeCommentsError, Page<CommentThread>>
-
-  suspend fun createComment(
-      userId: UserId,
-      id: RecipeId,
-      text: String,
-      parentId: CommentId?,
-  ): Either<CreateRecipeCommentError, Comment>
-
   suspend fun clone(userId: UserId, id: RecipeId): Either<CloneRecipeError, Recipe>
 }
 
@@ -122,7 +93,6 @@ interface RecipeService {
 class RecipeServiceImpl(
     private val repo: RecipeRepository,
     private val likeService: LikeService,
-    private val commentService: CommentService,
     private val uploadService: UploadService,
 ) : RecipeService {
 
@@ -225,28 +195,6 @@ class RecipeServiceImpl(
   ): Either<ToggleLikeError, LikeInfo> = either {
     repo.findById(id) ?: raise(ToggleLikeError.RecipeNotFound)
     likeService.toggle(userId, id.value, LikeTargetType.RECIPE)
-  }
-
-  override suspend fun listComments(
-      id: RecipeId,
-      page: Int,
-      limit: Int,
-  ): Either<ListRecipeCommentsError, Page<CommentThread>> = either {
-    repo.findById(id) ?: raise(ListRecipeCommentsError.RecipeNotFound)
-    commentService.list(id.value, CommentTargetType.RECIPE, page, limit)
-  }
-
-  override suspend fun createComment(
-      userId: UserId,
-      id: RecipeId,
-      text: String,
-      parentId: CommentId?,
-  ): Either<CreateRecipeCommentError, Comment> = either {
-    repo.findById(id) ?: raise(CreateRecipeCommentError.RecipeNotFound)
-    commentService
-        .create(userId, id.value, CommentTargetType.RECIPE, text, parentId)
-        .mapLeft { CreateRecipeCommentError.CommentError(it) }
-        .bind()
   }
 
   override suspend fun clone(userId: UserId, id: RecipeId): Either<CloneRecipeError, Recipe> =

@@ -25,7 +25,10 @@ import dev.roasti.feature.recipe.domain.model.BrewMethod
 import dev.roasti.feature.recipe.domain.model.Difficulty
 import dev.roasti.feature.recipe.domain.model.RoastLevel
 import dev.roasti.features.comments.CommentId
+import dev.roasti.features.comments.CommentService
+import dev.roasti.features.comments.CommentTarget
 import dev.roasti.features.comments.CommentThread
+import dev.roasti.features.comments.CreateCommentError
 import dev.roasti.features.comments.toDto
 import dev.roasti.features.comments.toHttp
 import dev.roasti.features.likes.LikeInfo
@@ -48,6 +51,7 @@ import org.koin.ktor.ext.inject
 @OptIn(ExperimentalUuidApi::class)
 fun Route.recipeRoutes() {
   val recipeService by inject<RecipeService>()
+  val commentService by inject<CommentService>()
 
   route("/recipes") {
     get {
@@ -88,12 +92,8 @@ fun Route.recipeRoutes() {
               ?: return@get call.respond(HttpStatusCode.BadRequest)
       val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
       val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
-      recipeService
-          .listComments(id, page, limit)
-          .fold(
-              ifLeft = { call.respondError(it, ListRecipeCommentsError::toHttp) },
-              ifRight = { result -> call.respond(result.toDto { it.toDto() }) },
-          )
+      val result = commentService.list(CommentTarget.Recipe(id), page, limit)
+      call.respond(result.toDto { it.toDto() })
     }
 
     authenticate(FIREBASE_AUTH) {
@@ -155,10 +155,10 @@ fun Route.recipeRoutes() {
         val userId = call.principal<FirebasePrincipal>()!!.id
         val body = call.receive<CreateCommentRequestDto>()
         val parentId = body.parentId?.let { CommentId(Uuid.parse(it)) }
-        recipeService
-            .createComment(userId, id, body.text, parentId)
+        commentService
+            .create(userId, CommentTarget.Recipe(id), body.text, parentId)
             .fold(
-                ifLeft = { call.respondError(it, CreateRecipeCommentError::toHttp) },
+                ifLeft = { call.respondError(it, CreateCommentError::toHttp) },
                 ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
             )
       }
@@ -395,17 +395,6 @@ private fun UpdateRecipeError.toHttp() =
 private fun ToggleLikeError.toHttp() =
     when (this) {
       ToggleLikeError.RecipeNotFound -> ApiErrors.NotFound
-    }
-
-private fun ListRecipeCommentsError.toHttp() =
-    when (this) {
-      ListRecipeCommentsError.RecipeNotFound -> ApiErrors.NotFound
-    }
-
-private fun CreateRecipeCommentError.toHttp() =
-    when (this) {
-      CreateRecipeCommentError.RecipeNotFound -> ApiErrors.NotFound
-      is CreateRecipeCommentError.CommentError -> error.toHttp()
     }
 
 private fun CloneRecipeError.toHttp() =

@@ -22,8 +22,9 @@ import dev.roasti.feature.post.data.remote.model.response.PostResponseDto
 import dev.roasti.feature.post.data.remote.model.response.PostVoteResponseDto
 import dev.roasti.features.comments.CommentId
 import dev.roasti.features.comments.CommentService
-import dev.roasti.features.comments.CommentTargetType
+import dev.roasti.features.comments.CommentTarget
 import dev.roasti.features.comments.CommentThread
+import dev.roasti.features.comments.CreateCommentError
 import dev.roasti.features.comments.toDto
 import dev.roasti.features.comments.toHttp
 import dev.roasti.features.recipes.RecipeId
@@ -84,7 +85,7 @@ fun Route.postRoutes() {
                 ?: return@get call.respond(HttpStatusCode.BadRequest)
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
-        val result = commentService.list(id.value, CommentTargetType.POST, page, limit)
+        val result = commentService.list(CommentTarget.Post(id), page, limit)
         call.respond(
             PageResponseDto(
                 items = result.items.map { it.toDto() },
@@ -197,10 +198,10 @@ fun Route.postRoutes() {
             body.parentId?.let {
               it.toId(::CommentId) ?: return@post call.respond(HttpStatusCode.BadRequest)
             }
-        postService
-            .createComment(userId, id, body.text, parentId)
+        commentService
+            .create(userId, CommentTarget.Post(id), body.text, parentId)
             .fold(
-                ifLeft = { call.respondError(it, CreatePostCommentError::toHttp) },
+                ifLeft = { call.respondError(it, CreateCommentError::toHttp) },
                 ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
             )
       }
@@ -322,14 +323,6 @@ private fun VotePostError.toHttp() =
     when (this) {
       VotePostError.PostNotFound ->
           HttpStatusCode.NotFound to ApiError(ApiErrorCode.POST_NOT_FOUND, "Post not found")
-    }
-
-private fun CreatePostCommentError.toHttp() =
-    when (this) {
-      CreatePostCommentError.PostNotFound ->
-          HttpStatusCode.NotFound to ApiError(ApiErrorCode.POST_NOT_FOUND, "Post not found")
-
-      is CreatePostCommentError.CommentError -> error.toHttp()
     }
 
 fun PostContentValidationError.toHttp() =

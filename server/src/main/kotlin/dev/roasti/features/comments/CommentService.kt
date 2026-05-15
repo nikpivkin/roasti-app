@@ -4,12 +4,22 @@ import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import dev.roasti.common.domain.Page
+import dev.roasti.features.posts.PostId
+import dev.roasti.features.recipes.RecipeId
 import dev.roasti.features.users.model.UserId
 import kotlin.uuid.Uuid
 
 const val TEXT_MAX_LENGTH = 1000
 
 sealed interface CreateCommentError {
+  data object TargetNotFound : CreateCommentError
+
+  data object TargetNotVisible : CreateCommentError
+
+  data object CommentsDisabled : CreateCommentError
+
+  data object ParentNotFound : CreateCommentError
+
   data class InvalidInput(val message: String) : CreateCommentError
 }
 
@@ -27,11 +37,27 @@ sealed interface DeleteCommentError {
   data object Forbidden : DeleteCommentError
 }
 
+enum class CommentTargetType {
+  POST,
+  RECIPE,
+}
+
+sealed class CommentTarget {
+  abstract val type: CommentTargetType
+
+  data class Post(val id: PostId) : CommentTarget() {
+    override val type = CommentTargetType.POST
+  }
+
+  data class Recipe(val id: RecipeId) : CommentTarget() {
+    override val type = CommentTargetType.RECIPE
+  }
+}
+
 interface CommentService {
   suspend fun create(
       userId: UserId,
-      targetId: Uuid,
-      targetType: CommentTargetType,
+      target: CommentTarget,
       text: String,
       parentId: CommentId?,
   ): Either<CreateCommentError, Comment>
@@ -44,12 +70,7 @@ interface CommentService {
 
   suspend fun delete(userId: UserId, commentId: CommentId): Either<DeleteCommentError, Unit>
 
-  suspend fun list(
-      targetId: Uuid,
-      targetType: CommentTargetType,
-      page: Int,
-      limit: Int,
-  ): Page<CommentThread>
+  suspend fun list(target: CommentTarget, page: Int, limit: Int): Page<CommentThread>
 
   suspend fun countForTarget(targetId: Uuid, targetType: CommentTargetType): Int
 
@@ -59,15 +80,20 @@ interface CommentService {
   ): Map<Uuid, Int>
 }
 
-class CommentServiceImpl(private val repo: CommentRepository) : CommentService {
+class CommentServiceImpl(
+    private val repo: CommentRepository,
+    private val resolvers: Map<CommentTargetType, CommentTargetResolver>,
+) : CommentService {
 
   override suspend fun create(
       userId: UserId,
-      targetId: Uuid,
-      targetType: CommentTargetType,
+      target: CommentTarget,
       text: String,
       parentId: CommentId?,
   ): Either<CreateCommentError, Comment> = either {
+    val resolver = resolvers.getValue(target.type)
+    resolver.resolve(target, userId).mapLeft { it.toCreateCommentError() }.bind()
+
     val normalized = text.trim()
     if (normalized.isBlank())
         raise(CreateCommentError.InvalidInput("comment text must not be empty"))
@@ -78,15 +104,13 @@ class CommentServiceImpl(private val repo: CommentRepository) : CommentService {
             )
         )
 
-    if (parentId != null) {
-      if (!repo.existsInTarget(parentId, targetId))
-          raise(CreateCommentError.InvalidInput("parent comment not found"))
-    }
+    if (parentId != null && !repo.existsInTarget(parentId, target.targetId))
+        raise(CreateCommentError.ParentNotFound)
 
     repo.create(
         CreateCommentInput(
-            targetId = targetId,
-            targetType = targetType,
+            targetId = target.targetId,
+            targetType = target.type,
             authorId = userId,
             text = normalized,
             parentId = parentId,
@@ -122,24 +146,30 @@ class CommentServiceImpl(private val repo: CommentRepository) : CommentService {
     repo.softDelete(commentId)
   }
 
-  override suspend fun list(
-      targetId: Uuid,
-      targetType: CommentTargetType,
-      page: Int,
-      limit: Int,
-  ): Page<CommentThread> {
-    val (items, total) = repo.listForTarget(targetId, targetType, page, limit)
+  override suspend fun list(target: CommentTarget, page: Int, limit: Int): Page<CommentThread> {
+    val (items, total) = repo.listForTarget(target.targetId, target.type, page, limit)
     return Page.of(items, page, total, limit)
   }
 
-  override suspend fun countForTarget(targetId: Uuid, targetType: CommentTargetType): Int {
-    return repo.countForTargetBatch(listOf(targetId), targetType)[targetId] ?: 0
-  }
+  override suspend fun countForTarget(targetId: Uuid, targetType: CommentTargetType): Int =
+      repo.countForTargetBatch(listOf(targetId), targetType)[targetId] ?: 0
 
   override suspend fun countForTargetBatch(
       targetIds: List<Uuid>,
       targetType: CommentTargetType,
-  ): Map<Uuid, Int> {
-    return repo.countForTargetBatch(targetIds, targetType)
-  }
+  ): Map<Uuid, Int> = repo.countForTargetBatch(targetIds, targetType)
+
+  private fun TargetError.toCreateCommentError(): CreateCommentError =
+      when (this) {
+        TargetError.NotFound -> CreateCommentError.TargetNotFound
+        TargetError.NotVisible -> CreateCommentError.TargetNotVisible
+        TargetError.CommentsDisabled -> CreateCommentError.CommentsDisabled
+      }
 }
+
+private val CommentTarget.targetId: Uuid
+  get() =
+      when (this) {
+        is CommentTarget.Post -> id.value
+        is CommentTarget.Recipe -> id.value
+      }

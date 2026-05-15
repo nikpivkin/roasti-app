@@ -20,12 +20,14 @@ import dev.roasti.features.comments.CommentRepositoryImpl
 import dev.roasti.features.comments.CommentService
 import dev.roasti.features.comments.CommentServiceImpl
 import dev.roasti.features.comments.CommentTable
+import dev.roasti.features.comments.CommentTargetType
 import dev.roasti.features.comments.commentRoutes
 import dev.roasti.features.likes.LikeRepository
 import dev.roasti.features.likes.LikeRepositoryImpl
 import dev.roasti.features.likes.LikeService
 import dev.roasti.features.likes.LikeServiceImpl
 import dev.roasti.features.likes.LikeTable
+import dev.roasti.features.posts.PostCommentTargetResolver
 import dev.roasti.features.posts.PostRepository
 import dev.roasti.features.posts.PostRepositoryImpl
 import dev.roasti.features.posts.PostService
@@ -33,6 +35,7 @@ import dev.roasti.features.posts.PostServiceImpl
 import dev.roasti.features.posts.PostTable
 import dev.roasti.features.posts.postRoutes
 import dev.roasti.features.recipes.BrewStepTable
+import dev.roasti.features.recipes.RecipeCommentTargetResolver
 import dev.roasti.features.recipes.RecipeRepository
 import dev.roasti.features.recipes.RecipeRepositoryImpl
 import dev.roasti.features.recipes.RecipeService
@@ -146,15 +149,24 @@ fun Application.module() {
           single<RevokedTokenRepository> { RevokedTokenRepositoryImpl() }
           single { FirebaseAuth.getInstance() }
           single<CommentRepository> { CommentRepositoryImpl() }
-          single<CommentService> { CommentServiceImpl(get()) }
           single<PostRepository> { PostRepositoryImpl() }
-          single<PostService> { PostServiceImpl(get(), get(), get(), get(), get()) }
           single<LikeRepository> { LikeRepositoryImpl() }
           single<LikeService> { LikeServiceImpl(get()) }
           single<VoteRepository> { VoteRepositoryImpl() }
           single<VoteService> { VoteServiceImpl(get()) }
           single<RecipeRepository> { RecipeRepositoryImpl() }
-          single<RecipeService> { RecipeServiceImpl(get(), get(), get(), get()) }
+          single<RecipeService> { RecipeServiceImpl(get(), get(), get()) }
+          single<CommentService> {
+            CommentServiceImpl(
+                repo = get(),
+                resolvers =
+                    mapOf(
+                        CommentTargetType.POST to PostCommentTargetResolver(get()),
+                        CommentTargetType.RECIPE to RecipeCommentTargetResolver(get()),
+                    ),
+            )
+          }
+          single<PostService> { PostServiceImpl(get(), get(), get(), get(), get()) }
           single<FileStorage> { LocalFileStorage(uploadsDir) }
           single<UploadRepository> { UploadRepositoryImpl() }
           single<UploadService> { UploadServiceImpl(get(), get()) }

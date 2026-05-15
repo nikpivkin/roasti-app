@@ -7,6 +7,7 @@ import io.ktor.server.response.respond
 import kotlinx.serialization.Serializable
 
 enum class ApiErrorCode {
+  NOT_FOUND,
   RECIPE_NOT_FOUND,
   POST_NOT_FOUND,
   PARENT_COMMENT_NOT_FOUND,
