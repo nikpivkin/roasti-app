@@ -118,12 +118,21 @@ class PostServiceImpl(
     val voteInfos = voteService.getInfoBatch(userId, postIds, VoteTargetType.POST)
     val commentCounts = commentService.countForTargetBatch(postIds, CommentTargetType.POST)
 
+    val recipeIds = rows.mapNotNull { it.recipeId }
+    val existingRecipeIds = recipeService.existsByIds(recipeIds)
+
     val posts =
         rows.map { row ->
           val id = row.id.value
+          val recipeRef =
+              row.recipeId?.let { recipeId ->
+                if (recipeId in existingRecipeIds) RecipeRef.Available(recipeId)
+                else RecipeRef.Unavailable(recipeId)
+              }
           row.toPost(
               voteInfo = voteInfos.getValue(id),
               commentsCount = commentCounts.getValue(id),
+              recipeRef = recipeRef,
           )
         }
 
@@ -210,6 +219,11 @@ class PostServiceImpl(
   private suspend fun PostRow.enrich(userId: UserId?): Post {
     val voteInfo = voteService.getInfo(userId, id.value, VoteTargetType.POST)
     val commentsCount = commentService.countForTarget(id.value, CommentTargetType.POST)
-    return toPost(voteInfo, commentsCount)
+    val recipeRef =
+        recipeId?.let { rid ->
+          val exists = recipeService.existsByIds(setOf(rid))
+          if (rid in exists) RecipeRef.Available(rid) else RecipeRef.Unavailable(rid)
+        }
+    return toPost(voteInfo, commentsCount, recipeRef)
   }
 }

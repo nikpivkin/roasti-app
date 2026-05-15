@@ -234,11 +234,16 @@ private fun Post.toDto() =
         title = title,
         text = text.orEmpty(),
         images = images,
-        // TODO: check if recipe still exists and return UNAVAILABLE if deleted (requires batch
-        // lookup in PostService)
         recipe =
-            recipeId?.let {
-              PostRecipeRefDto(id = it.toString(), status = PostRecipeStatusDto.AVAILABLE)
+            recipeRef?.let {
+              PostRecipeRefDto(
+                  id = it.id.toString(),
+                  status =
+                      when (it) {
+                        is RecipeRef.Available -> PostRecipeStatusDto.AVAILABLE
+                        is RecipeRef.Unavailable -> PostRecipeStatusDto.UNAVAILABLE
+                      },
+              )
             },
         rating = rating,
         userVote = userVote.toDto(),

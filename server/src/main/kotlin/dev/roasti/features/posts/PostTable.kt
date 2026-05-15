@@ -1,6 +1,5 @@
 package dev.roasti.features.posts
 
-import dev.roasti.features.recipes.RecipeTable
 import dev.roasti.features.users.UserTable
 import dev.roasti.features.users.model.UserPreview
 import dev.roasti.features.users.toUserPreview
@@ -17,8 +16,7 @@ object PostTable : UuidTable("posts") {
   val title = varchar("title", 500).nullable()
   val text = text("text").nullable()
   val images = array<String>("images")
-  @OptIn(ExperimentalUuidApi::class)
-  val recipeId = reference("recipe_id", RecipeTable, onDelete = ReferenceOption.SET_NULL).nullable()
+  val recipeId = uuid("recipe_id").nullable()
   val createdAt = timestamp("created_at")
   val updatedAt = timestamp("updated_at")
 }
@@ -43,20 +41,20 @@ internal fun ResultRow.toPostRow() =
         title = this[PostTable.title],
         text = this[PostTable.text],
         images = this[PostTable.images],
-        recipeId = this[PostTable.recipeId]?.value,
+        recipeId = this[PostTable.recipeId],
         createdAt = this[PostTable.createdAt],
         updatedAt = this[PostTable.updatedAt],
     )
 
 @OptIn(ExperimentalUuidApi::class)
-internal fun PostRow.toPost(voteInfo: VoteInfo, commentsCount: Int) =
+internal fun PostRow.toPost(voteInfo: VoteInfo, commentsCount: Int, recipeRef: RecipeRef?) =
     Post(
         id = id,
         author = author,
         title = title,
         text = text,
         images = images,
-        recipeId = recipeId,
+        recipeRef = recipeRef,
         rating = voteInfo.rating,
         userVote = voteInfo.userVote,
         commentsCount = commentsCount,

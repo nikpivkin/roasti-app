@@ -19,6 +19,7 @@ import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -48,6 +49,8 @@ data class CreateBrewStepInput(
 interface RecipeRepository {
   suspend fun findById(id: RecipeId): RecipeRow?
 
+  suspend fun existsByIds(ids: Collection<Uuid>): Set<Uuid>
+
   suspend fun list(
       page: Int,
       limit: Int,
@@ -76,6 +79,18 @@ class RecipeRepositoryImpl : RecipeRepository {
       withContext(Dispatchers.IO) {
         transaction {
           recipeQuery().where { RecipeTable.id eq id.value }.singleOrNull()?.toRecipeRow()
+        }
+      }
+
+  @OptIn(ExperimentalUuidApi::class)
+  override suspend fun existsByIds(ids: Collection<Uuid>): Set<Uuid> =
+      withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext emptySet()
+        transaction {
+          RecipeTable.select(RecipeTable.id)
+              .where { RecipeTable.id inList ids }
+              .map { it[RecipeTable.id].value }
+              .toSet()
         }
       }
 

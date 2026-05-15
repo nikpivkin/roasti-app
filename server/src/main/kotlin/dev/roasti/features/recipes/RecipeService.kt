@@ -19,6 +19,7 @@ import dev.roasti.features.likes.LikeTargetType
 import dev.roasti.features.uploads.UploadService
 import dev.roasti.features.users.model.UserId
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 sealed interface GetRecipeError {
   data object NotFound : GetRecipeError
@@ -75,6 +76,8 @@ sealed interface RecipeValidationError {
 }
 
 interface RecipeService {
+  suspend fun existsByIds(ids: Collection<Uuid>): Set<Uuid>
+
   suspend fun getById(id: RecipeId, userId: UserId?): Either<GetRecipeError, Recipe>
 
   suspend fun list(
@@ -122,6 +125,8 @@ class RecipeServiceImpl(
     private val commentService: CommentService,
     private val uploadService: UploadService,
 ) : RecipeService {
+
+  override suspend fun existsByIds(ids: Collection<Uuid>): Set<Uuid> = repo.existsByIds(ids)
 
   override suspend fun getById(id: RecipeId, userId: UserId?): Either<GetRecipeError, Recipe> =
       either {
