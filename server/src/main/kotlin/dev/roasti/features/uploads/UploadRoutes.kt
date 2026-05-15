@@ -9,12 +9,11 @@ import io.ktor.http.content.forEachPart
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receiveMultipart
+import io.ktor.server.resources.get
+import io.ktor.server.resources.post
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
-import io.ktor.server.routing.route
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import kotlinx.serialization.SerialName
@@ -24,50 +23,46 @@ import org.koin.ktor.ext.inject
 fun Route.uploadRoutes() {
   val uploadService by inject<UploadService>()
 
-  route("/uploads/images") {
-    authenticate(FIREBASE_AUTH) {
-      post {
-        val uploaderId = call.principal<FirebasePrincipal>()!!.id
-        val multipart = call.receiveMultipart()
-        var saveResult: SaveUploadError? = null
-        var meta: UploadMeta? = null
-        var invalidMedia = false
-        multipart.forEachPart { part ->
-          if (part is PartData.FileItem && part.name == "file") {
-            val bytes = part.provider().readRemaining().readByteArray()
-            val filename = part.originalFileName ?: "upload"
-            val contentType = part.contentType?.toString() ?: contentTypeFromFilename(filename)
-            if (!contentType.startsWith("image/")) {
-              invalidMedia = true
-            } else {
-              uploadService
-                  .save(contentType, bytes, uploaderId)
-                  .fold(
-                      ifLeft = { saveResult = it },
-                      ifRight = { meta = it },
-                  )
-            }
-          }
-          part.dispose()
-        }
-        if (invalidMedia) return@post call.respond(HttpStatusCode.UnsupportedMediaType)
-        saveResult?.let { error ->
-          return@post when (error) {
-            SaveUploadError.EmptyFile -> call.respond(HttpStatusCode.UnsupportedMediaType)
-            SaveUploadError.FileTooLarge -> call.respond(HttpStatusCode.PayloadTooLarge)
+  authenticate(FIREBASE_AUTH) {
+    post<UploadImages> { _ ->
+      val uploaderId = call.principal<FirebasePrincipal>()!!.id
+      val multipart = call.receiveMultipart()
+      var saveResult: SaveUploadError? = null
+      var meta: UploadMeta? = null
+      var invalidMedia = false
+      multipart.forEachPart { part ->
+        if (part is PartData.FileItem && part.name == "file") {
+          val bytes = part.provider().readRemaining().readByteArray()
+          val filename = part.originalFileName ?: "upload"
+          val contentType = part.contentType?.toString() ?: contentTypeFromFilename(filename)
+          if (!contentType.startsWith("image/")) {
+            invalidMedia = true
+          } else {
+            uploadService
+                .save(contentType, bytes, uploaderId)
+                .fold(
+                    ifLeft = { saveResult = it },
+                    ifRight = { meta = it },
+                )
           }
         }
-        val result =
-            meta ?: return@post call.respond(HttpStatusCode.BadRequest, "missing file field")
-        call.respond(HttpStatusCode.Created, UploadResponseDto(result.id))
+        part.dispose()
       }
+      if (invalidMedia) return@post call.respond(HttpStatusCode.UnsupportedMediaType)
+      saveResult?.let { error ->
+        return@post when (error) {
+          SaveUploadError.EmptyFile -> call.respond(HttpStatusCode.UnsupportedMediaType)
+          SaveUploadError.FileTooLarge -> call.respond(HttpStatusCode.PayloadTooLarge)
+        }
+      }
+      val result = meta ?: return@post call.respond(HttpStatusCode.BadRequest, "missing file field")
+      call.respond(HttpStatusCode.Created, UploadResponseDto(result.id))
     }
+  }
 
-    get("/{id}") {
-      val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-      val upload = uploadService.findById(id) ?: return@get call.respond(HttpStatusCode.NotFound)
-      call.respondBytes(upload.bytes, ContentType.parse(upload.contentType))
-    }
+  get<UploadImages.ById> { res ->
+    val upload = uploadService.findById(res.id) ?: return@get call.respond(HttpStatusCode.NotFound)
+    call.respondBytes(upload.bytes, ContentType.parse(upload.contentType))
   }
 }
 

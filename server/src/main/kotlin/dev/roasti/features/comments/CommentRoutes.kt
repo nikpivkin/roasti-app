@@ -12,47 +12,37 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
+import io.ktor.server.resources.delete
+import io.ktor.server.resources.patch
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.patch
-import io.ktor.server.routing.route
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 import org.koin.ktor.ext.inject
 
 @OptIn(ExperimentalUuidApi::class)
 fun Route.commentRoutes() {
   val commentService by inject<CommentService>()
 
-  route("/comments/{id}") {
-    authenticate(FIREBASE_AUTH) {
-      patch {
-        val id =
-            call.parameters["id"]?.let { CommentId(Uuid.parse(it)) }
-                ?: return@patch call.respond(HttpStatusCode.BadRequest)
-        val userId = call.principal<FirebasePrincipal>()!!.id
-        val body = call.receive<UpdateCommentRequestDto>()
-        commentService
-            .update(userId, id, body.text)
-            .fold(
-                ifLeft = { call.respondError(it, UpdateCommentError::toHttp) },
-                ifRight = { call.respond(it.toDto()) },
-            )
-      }
+  authenticate(FIREBASE_AUTH) {
+    patch<Comments.ById> { res ->
+      val userId = call.principal<FirebasePrincipal>()!!.id
+      val body = call.receive<UpdateCommentRequestDto>()
+      commentService
+          .update(userId, res.id, body.text)
+          .fold(
+              ifLeft = { call.respondError(it, UpdateCommentError::toHttp) },
+              ifRight = { call.respond(it.toDto()) },
+          )
+    }
 
-      delete {
-        val id =
-            call.parameters["id"]?.let { CommentId(Uuid.parse(it)) }
-                ?: return@delete call.respond(HttpStatusCode.BadRequest)
-        val userId = call.principal<FirebasePrincipal>()!!.id
-        commentService
-            .delete(userId, id)
-            .fold(
-                ifLeft = { call.respond(HttpStatusCode.NoContent) },
-                ifRight = { call.respond(HttpStatusCode.NoContent) },
-            )
-      }
+    delete<Comments.ById> { res ->
+      val userId = call.principal<FirebasePrincipal>()!!.id
+      commentService
+          .delete(userId, res.id)
+          .fold(
+              ifLeft = { call.respond(HttpStatusCode.NoContent) },
+              ifRight = { call.respond(HttpStatusCode.NoContent) },
+          )
     }
   }
 }

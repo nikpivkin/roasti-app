@@ -236,7 +236,7 @@ class RecipeTest {
 
     val page =
         client
-            .get("/api/v1/recipes?brew_method=AEROPRESS")
+            .get("/api/v1/recipes?brew_method=aeropress")
             .body<PageResponseDto<RecipeResponseDto>>()
     assertTrue(page.items.isNotEmpty())
     assertTrue(page.items.all { it.brewMethod == BrewMethodDto.AEROPRESS })
@@ -248,7 +248,7 @@ class RecipeTest {
     createRecipe(client, samplePayload().copy(roastLevel = RoastLevelDto.DARK))
 
     val page =
-        client.get("/api/v1/recipes?roast_level=DARK").body<PageResponseDto<RecipeResponseDto>>()
+        client.get("/api/v1/recipes?roast_level=dark").body<PageResponseDto<RecipeResponseDto>>()
     assertTrue(page.items.isNotEmpty())
     assertTrue(page.items.all { it.roastLevel == RoastLevelDto.DARK })
   }

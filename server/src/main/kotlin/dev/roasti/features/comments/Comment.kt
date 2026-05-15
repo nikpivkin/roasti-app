@@ -4,8 +4,9 @@ import dev.roasti.features.users.model.UserPreview
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import kotlinx.serialization.Serializable
 
-@OptIn(ExperimentalUuidApi::class) @JvmInline value class CommentId(val value: Uuid)
+@OptIn(ExperimentalUuidApi::class) @JvmInline @Serializable value class CommentId(val value: Uuid)
 
 @OptIn(ExperimentalUuidApi::class)
 sealed class Comment {

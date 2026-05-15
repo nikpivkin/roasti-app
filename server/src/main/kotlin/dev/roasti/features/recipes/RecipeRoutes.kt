@@ -35,20 +35,17 @@ import dev.roasti.features.likes.LikeInfo
 import dev.roasti.features.likes.LikeService
 import dev.roasti.features.likes.LikeTarget
 import dev.roasti.features.likes.LikeTargetError
-import dev.roasti.features.users.model.UserId
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
+import io.ktor.server.resources.delete
+import io.ktor.server.resources.get
+import io.ktor.server.resources.post
+import io.ktor.server.resources.put
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
-import io.ktor.server.routing.put
-import io.ktor.server.routing.route
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 import org.koin.ktor.ext.inject
 
 @OptIn(ExperimentalUuidApi::class)
@@ -57,128 +54,99 @@ fun Route.recipeRoutes() {
   val commentService by inject<CommentService>()
   val likeService by inject<LikeService>()
 
-  route("/recipes") {
-    get {
-      val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
-      val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
-      val authorId =
-          call.queryParameters["author_id"]?.let {
-            it.toId(::UserId) ?: return@get call.respond(HttpStatusCode.BadRequest)
-          }
-      val brewMethod =
-          call.request.queryParameters["brew_method"]?.let { parseBrewMethodDto(it)?.toDomain() }
-      val difficulty =
-          call.request.queryParameters["difficulty"]?.let { parseDifficultyDto(it)?.toDomain() }
-      val roastLevel =
-          call.request.queryParameters["roast_level"]?.let { parseRoastLevelDto(it)?.toDomain() }
-      val userId = call.principal<FirebasePrincipal>()?.id
-      val recipesPage =
-          recipeService.list(page, limit, authorId, userId, brewMethod, difficulty, roastLevel)
-      call.respond(recipesPage.toDto())
+  get<Recipes> { res ->
+    val userId = call.principal<FirebasePrincipal>()?.id
+    val recipesPage =
+        recipeService.list(
+            res.page,
+            res.limit,
+            res.authorId,
+            userId,
+            res.brewMethod?.toDomain(),
+            res.difficulty?.toDomain(),
+            res.roastLevel?.toDomain(),
+        )
+    call.respond(recipesPage.toDto())
+  }
+
+  get<Recipes.ById> { res ->
+    val userId = call.principal<FirebasePrincipal>()?.id
+    recipeService
+        .getById(res.id, userId)
+        .fold(
+            ifLeft = { call.respondError(it, GetRecipeError::toHttp) },
+            ifRight = { call.respond(it.toDto()) },
+        )
+  }
+
+  get<Recipes.ById.Comments> { res ->
+    val result = commentService.list(CommentTarget.Recipe(res.parent.id), res.page, res.limit)
+    call.respond(result.toDto { it.toDto() })
+  }
+
+  authenticate(FIREBASE_AUTH) {
+    post<Recipes> { _ ->
+      val userId = call.principal<FirebasePrincipal>()!!.id
+      val body = call.receive<CreateRecipeRequestDto>()
+      recipeService
+          .create(userId, body.toInput())
+          .fold(
+              ifLeft = { call.respondError(it, CreateRecipeError::toHttp) },
+              ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
+          )
     }
 
-    get("/{id}") {
-      val id =
-          call.pathParameters["id"]?.toId(::RecipeId)
-              ?: return@get call.respond(HttpStatusCode.BadRequest)
-      val userId = call.principal<FirebasePrincipal>()?.id
+    put<Recipes.ById> { res ->
+      val userId = call.principal<FirebasePrincipal>()!!.id
+      val body = call.receive<CreateRecipeRequestDto>()
       recipeService
-          .getById(id, userId)
+          .update(userId, res.id, body.toInput())
           .fold(
-              ifLeft = { call.respondError(it, GetRecipeError::toHttp) },
+              ifLeft = { call.respondError(it, UpdateRecipeError::toHttp) },
               ifRight = { call.respond(it.toDto()) },
           )
     }
 
-    get("/{id}/comments") {
-      val id =
-          call.pathParameters["id"]?.toId(::RecipeId)
-              ?: return@get call.respond(HttpStatusCode.BadRequest)
-      val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
-      val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
-      val result = commentService.list(CommentTarget.Recipe(id), page, limit)
-      call.respond(result.toDto { it.toDto() })
+    delete<Recipes.ById> { res ->
+      val userId = call.principal<FirebasePrincipal>()!!.id
+      recipeService
+          .delete(userId, res.id)
+          .fold(
+              ifLeft = { call.respond(HttpStatusCode.NoContent) },
+              ifRight = { call.respond(HttpStatusCode.NoContent) },
+          )
     }
 
-    authenticate(FIREBASE_AUTH) {
-      post {
-        val userId = call.principal<FirebasePrincipal>()!!.id
-        val body = call.receive<CreateRecipeRequestDto>()
-        recipeService
-            .create(userId, body.toInput())
-            .fold(
-                ifLeft = { call.respondError(it, CreateRecipeError::toHttp) },
-                ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
-            )
-      }
+    post<Recipes.ById.Like> { res ->
+      val userId = call.principal<FirebasePrincipal>()!!.id
+      likeService
+          .toggle(userId, LikeTarget.Recipe(res.parent.id))
+          .fold(
+              ifLeft = { call.respondError(it, LikeTargetError::toHttp) },
+              ifRight = { call.respond(it.toDto()) },
+          )
+    }
 
-      put("/{id}") {
-        val id =
-            call.pathParameters["id"]?.toId(::RecipeId)
-                ?: return@put call.respond(HttpStatusCode.BadRequest)
-        val userId = call.principal<FirebasePrincipal>()!!.id
-        val body = call.receive<CreateRecipeRequestDto>()
-        recipeService
-            .update(userId, id, body.toInput())
-            .fold(
-                ifLeft = { call.respondError(it, UpdateRecipeError::toHttp) },
-                ifRight = { call.respond(it.toDto()) },
-            )
-      }
+    post<Recipes.ById.Comments> { res ->
+      val userId = call.principal<FirebasePrincipal>()!!.id
+      val body = call.receive<CreateCommentRequestDto>()
+      val parentId = body.parentId?.let { it.toId(::CommentId) }
+      commentService
+          .create(userId, CommentTarget.Recipe(res.parent.id), body.text, parentId)
+          .fold(
+              ifLeft = { call.respondError(it, CreateCommentError::toHttp) },
+              ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
+          )
+    }
 
-      delete("/{id}") {
-        val id =
-            call.pathParameters["id"]?.toId(::RecipeId)
-                ?: return@delete call.respond(HttpStatusCode.BadRequest)
-        val userId = call.principal<FirebasePrincipal>()!!.id
-        recipeService
-            .delete(userId, id)
-            .fold(
-                ifLeft = { call.respond(HttpStatusCode.NoContent) },
-                ifRight = { call.respond(HttpStatusCode.NoContent) },
-            )
-      }
-
-      post("/{id}/like") {
-        val id =
-            call.pathParameters["id"]?.toId(::RecipeId)
-                ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val userId = call.principal<FirebasePrincipal>()!!.id
-        likeService
-            .toggle(userId, LikeTarget.Recipe(id))
-            .fold(
-                ifLeft = { call.respondError(it, LikeTargetError::toHttp) },
-                ifRight = { call.respond(it.toDto()) },
-            )
-      }
-
-      post("/{id}/comments") {
-        val id =
-            call.pathParameters["id"]?.toId(::RecipeId)
-                ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val userId = call.principal<FirebasePrincipal>()!!.id
-        val body = call.receive<CreateCommentRequestDto>()
-        val parentId = body.parentId?.let { CommentId(Uuid.parse(it)) }
-        commentService
-            .create(userId, CommentTarget.Recipe(id), body.text, parentId)
-            .fold(
-                ifLeft = { call.respondError(it, CreateCommentError::toHttp) },
-                ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
-            )
-      }
-
-      post("/{id}/clone") {
-        val id =
-            call.pathParameters["id"]?.toId(::RecipeId)
-                ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val userId = call.principal<FirebasePrincipal>()!!.id
-        recipeService
-            .clone(userId, id)
-            .fold(
-                ifLeft = { call.respondError(it, CloneRecipeError::toHttp) },
-                ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
-            )
-      }
+    post<Recipes.ById.Clone> { res ->
+      val userId = call.principal<FirebasePrincipal>()!!.id
+      recipeService
+          .clone(userId, res.parent.id)
+          .fold(
+              ifLeft = { call.respondError(it, CloneRecipeError::toHttp) },
+              ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
+          )
     }
   }
 }
@@ -299,7 +267,7 @@ private fun RoastLevel.toDto() =
       RoastLevel.NONE -> RoastLevelDto.NONE
     }
 
-private fun BrewMethodDto?.toDomain() =
+private fun BrewMethodDto.toDomain() =
     when (this) {
       BrewMethodDto.V60 -> BrewMethod.V60
       BrewMethodDto.FRENCH_PRESS -> BrewMethod.FrenchPress
@@ -308,8 +276,7 @@ private fun BrewMethodDto?.toDomain() =
       BrewMethodDto.COLD_BREW -> BrewMethod.ColdBrew
       BrewMethodDto.EXPRESSO_MACHINE -> BrewMethod.EspressoMachine
       BrewMethodDto.MOKA_POT -> BrewMethod.MokaPot
-      BrewMethodDto.NONE,
-      null -> BrewMethod.NONE
+      BrewMethodDto.NONE -> BrewMethod.NONE
     }
 
 private fun DifficultyDto.toDomain() =
@@ -329,15 +296,6 @@ private fun RoastLevelDto?.toDomain() =
       RoastLevelDto.NONE,
       null -> RoastLevel.NONE
     }
-
-private fun parseBrewMethodDto(value: String) =
-    runCatching { BrewMethodDto.valueOf(value.uppercase()) }.getOrNull()
-
-private fun parseDifficultyDto(value: String) =
-    runCatching { DifficultyDto.valueOf(value.uppercase()) }.getOrNull()
-
-private fun parseRoastLevelDto(value: String) =
-    runCatching { RoastLevelDto.valueOf(value.uppercase()) }.getOrNull()
 
 private fun CommentThread.toDto() =
     root.toDto().let { r ->

@@ -9,10 +9,10 @@ import io.ktor.server.application.install
 import io.ktor.server.application.log
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.bearer
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalUuidApi::class)
 fun Application.configureAuthentication() {
@@ -21,9 +21,7 @@ fun Application.configureAuthentication() {
     bearer(FIREBASE_AUTH) {
       authenticate { credential ->
         try {
-          val decoded = withContext(Dispatchers.IO) {
-            firebaseAuth.verifyIdToken(credential.token)
-          }
+          val decoded = withContext(Dispatchers.IO) { firebaseAuth.verifyIdToken(credential.token) }
           // TODO: test — token without id claim must return 401
           val id = decoded.claims["id"] as? String ?: return@authenticate null
           FirebasePrincipal(UserId(Uuid.parse(id)))

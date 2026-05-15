@@ -20,11 +20,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
+import io.ktor.server.resources.get
+import io.ktor.server.resources.patch
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
-import io.ktor.server.routing.patch
-import io.ktor.server.routing.route
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -39,61 +38,51 @@ fun Route.userRoutes() {
   val updateProfile by inject<UpdateProfile>()
   val checkUsernameAvailability by inject<CheckUsernameAvailability>()
 
-  route("/users") {
-    authenticate(FIREBASE_AUTH) {
-      route("me") {
-        get {
-          val userId =
-              call.principal<FirebasePrincipal>()?.id
-                  ?: return@get call.respond(HttpStatusCode.Unauthorized)
-          getCurrentUser(userId)
-              .fold(
-                  ifLeft = { call.respondError(it, GetUserError::toHttp) },
-                  ifRight = { call.respond(it.toDto()) },
-              )
-        }
-
-        patch {
-          val userId =
-              call.principal<FirebasePrincipal>()?.id
-                  ?: return@patch call.respond(HttpStatusCode.Unauthorized)
-          // TODO: support explicit null to clear nullable fields (name, bio, avatarId)
-          val body = call.receive<UpdateProfileRequest>()
-          val input =
-              UpdateProfileInput(
-                  username = body.username,
-                  name = body.name,
-                  bio = body.bio,
-                  avatarId = body.imageId,
-              )
-          updateProfile(userId, input)
-              .fold(
-                  ifLeft = { call.respondError(it, UpdateProfileError::toHttp) },
-                  ifRight = { call.respond(it.toDto()) },
-              )
-        }
-      }
-    }
-
-    get("/username-availability") {
-      val username =
-          call.request.queryParameters["username"]
-              ?: return@get call.respond(
-                  HttpStatusCode.BadRequest,
-                  "username query param required",
-              )
-      call.respond(UsernameAvailabilityResponse(checkUsernameAvailability(username)))
-    }
-
-    get("/{username}") {
-      val username = call.parameters["username"]!!
-      // TODO: public profile should not expose email — use a separate DTO without email field
-      getUserProfile(username)
+  authenticate(FIREBASE_AUTH) {
+    get<Users.Me> { _ ->
+      val userId =
+          call.principal<FirebasePrincipal>()?.id
+              ?: return@get call.respond(HttpStatusCode.Unauthorized)
+      getCurrentUser(userId)
           .fold(
               ifLeft = { call.respondError(it, GetUserError::toHttp) },
               ifRight = { call.respond(it.toDto()) },
           )
     }
+
+    patch<Users.Me> { _ ->
+      val userId =
+          call.principal<FirebasePrincipal>()?.id
+              ?: return@patch call.respond(HttpStatusCode.Unauthorized)
+      // TODO: support explicit null to clear nullable fields (name, bio, avatarId)
+      val body = call.receive<UpdateProfileRequest>()
+      updateProfile(
+              userId,
+              UpdateProfileInput(
+                  username = body.username,
+                  name = body.name,
+                  bio = body.bio,
+                  avatarId = body.imageId,
+              ),
+          )
+          .fold(
+              ifLeft = { call.respondError(it, UpdateProfileError::toHttp) },
+              ifRight = { call.respond(it.toDto()) },
+          )
+    }
+  }
+
+  get<Users.UsernameAvailability> { res ->
+    call.respond(UsernameAvailabilityResponse(checkUsernameAvailability(res.username)))
+  }
+
+  get<Users.ByUsername> { res ->
+    // TODO: public profile should not expose email — use a separate DTO without email field
+    getUserProfile(res.username)
+        .fold(
+            ifLeft = { call.respondError(it, GetUserError::toHttp) },
+            ifRight = { call.respond(it.toDto()) },
+        )
   }
 }
 

@@ -28,7 +28,6 @@ import dev.roasti.features.comments.CreateCommentError
 import dev.roasti.features.comments.toDto
 import dev.roasti.features.comments.toHttp
 import dev.roasti.features.recipes.RecipeId
-import dev.roasti.features.users.model.UserId
 import dev.roasti.features.users.model.UserPreview
 import dev.roasti.features.votes.VoteDirection
 import dev.roasti.features.votes.VoteInfo
@@ -39,13 +38,12 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
+import io.ktor.server.resources.delete
+import io.ktor.server.resources.get
+import io.ktor.server.resources.post
+import io.ktor.server.resources.put
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
-import io.ktor.server.routing.put
-import io.ktor.server.routing.route
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.datetime.Instant
 import org.koin.ktor.ext.inject
@@ -56,159 +54,130 @@ fun Route.postRoutes() {
   val commentService by inject<CommentService>()
   val voteService by inject<VoteService>()
 
-  route("/posts") {
-    authenticate(FIREBASE_AUTH) {
-      get {
-        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
-        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
-        val authorId =
-            call.queryParameters["author_id"]?.let {
-              it.toId(::UserId) ?: return@get call.respond(HttpStatusCode.BadRequest)
-            }
-        val userId = call.principal<FirebasePrincipal>()?.id
-        val postsPage = postService.list(page, limit, authorId, userId)
-        call.respond(postsPage.toDto())
-      }
+  authenticate(FIREBASE_AUTH) {
+    get<Posts> { res ->
+      val userId = call.principal<FirebasePrincipal>()?.id
+      val postsPage = postService.list(res.page, res.limit, res.authorId, userId)
+      call.respond(postsPage.toDto())
+    }
 
-      get("/{id}") {
-        val id =
-            call.pathParameters["id"]?.toId(::PostId)
-                ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val userId = call.principal<FirebasePrincipal>()?.id
-        postService
-            .getById(id, userId)
-            .fold(
-                ifLeft = { call.respondError(it, GetPostError::toHttp) },
-                ifRight = { call.respond(it.toDto()) },
-            )
-      }
+    get<Posts.ById> { res ->
+      val userId = call.principal<FirebasePrincipal>()?.id
+      postService
+          .getById(res.id, userId)
+          .fold(
+              ifLeft = { call.respondError(it, GetPostError::toHttp) },
+              ifRight = { call.respond(it.toDto()) },
+          )
+    }
 
-      get("/{id}/comments") {
-        val id =
-            call.pathParameters["id"]?.toId(::PostId)
-                ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
-        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
-        val result = commentService.list(CommentTarget.Post(id), page, limit)
-        call.respond(
-            PageResponseDto(
-                items = result.items.map { it.toDto() },
-                pagination =
-                    PaginationResponseDto(
-                        currentPage = result.currentPage,
-                        itemsCount = result.itemsCount,
-                        lastPage = result.lastPage,
-                        nextPage = result.nextPage,
-                    ),
-            )
-        )
-      }
+    get<Posts.ById.Comments> { res ->
+      val result = commentService.list(CommentTarget.Post(res.parent.id), res.page, res.limit)
+      call.respond(
+          PageResponseDto(
+              items = result.items.map { it.toDto() },
+              pagination =
+                  PaginationResponseDto(
+                      currentPage = result.currentPage,
+                      itemsCount = result.itemsCount,
+                      lastPage = result.lastPage,
+                      nextPage = result.nextPage,
+                  ),
+          )
+      )
+    }
 
-      post {
-        val userId =
-            call.principal<FirebasePrincipal>()?.id
-                ?: return@post call.respond(HttpStatusCode.Unauthorized)
-        val body = call.receive<CreatePostRequestDto>()
-        val recipeId =
-            body.recipeId?.let {
-              it.toId(::RecipeId) ?: return@post call.respond(HttpStatusCode.BadRequest)
-            }
-        postService
-            .create(
-                userId,
-                PostInput(
-                    title = body.title,
-                    text = body.text,
-                    images = body.images,
-                    recipeId = recipeId,
-                ),
-            )
-            .fold(
-                ifLeft = { call.respondError(it, CreatePostError::toHttp) },
-                ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
-            )
-      }
+    post<Posts> { _ ->
+      val userId =
+          call.principal<FirebasePrincipal>()?.id
+              ?: return@post call.respond(HttpStatusCode.Unauthorized)
+      val body = call.receive<CreatePostRequestDto>()
+      val recipeId =
+          body.recipeId?.let {
+            it.toId(::RecipeId) ?: return@post call.respond(HttpStatusCode.BadRequest)
+          }
+      postService
+          .create(
+              userId,
+              PostInput(
+                  title = body.title,
+                  text = body.text,
+                  images = body.images,
+                  recipeId = recipeId,
+              ),
+          )
+          .fold(
+              ifLeft = { call.respondError(it, CreatePostError::toHttp) },
+              ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
+          )
+    }
 
-      put("/{id}") {
-        val id =
-            call.pathParameters["id"]?.toId(::PostId)
-                ?: return@put call.respond(HttpStatusCode.BadRequest)
-        val userId =
-            call.principal<FirebasePrincipal>()?.id
-                ?: return@put call.respond(HttpStatusCode.Unauthorized)
-        val body = call.receive<UpdatePostRequestDto>()
-        val recipeId =
-            body.recipeId?.let {
-              it.toId(::RecipeId) ?: return@put call.respond(HttpStatusCode.BadRequest)
-            }
-        postService
-            .update(
-                userId,
-                id,
-                PostInput(
-                    title = body.title,
-                    text = body.text,
-                    images = body.images,
-                    recipeId = recipeId,
-                ),
-            )
-            .fold(
-                ifLeft = { call.respondError(it, UpdatePostError::toHttp) },
-                ifRight = { call.respond(it.toDto()) },
-            )
-      }
+    put<Posts.ById> { res ->
+      val userId =
+          call.principal<FirebasePrincipal>()?.id
+              ?: return@put call.respond(HttpStatusCode.Unauthorized)
+      val body = call.receive<UpdatePostRequestDto>()
+      val recipeId =
+          body.recipeId?.let {
+            it.toId(::RecipeId) ?: return@put call.respond(HttpStatusCode.BadRequest)
+          }
+      postService
+          .update(
+              userId,
+              res.id,
+              PostInput(
+                  title = body.title,
+                  text = body.text,
+                  images = body.images,
+                  recipeId = recipeId,
+              ),
+          )
+          .fold(
+              ifLeft = { call.respondError(it, UpdatePostError::toHttp) },
+              ifRight = { call.respond(it.toDto()) },
+          )
+    }
 
-      delete("/{id}") {
-        val id =
-            call.pathParameters["id"]?.toId(::PostId)
-                ?: return@delete call.respond(HttpStatusCode.BadRequest)
-        val userId =
-            call.principal<FirebasePrincipal>()?.id
-                ?: return@delete call.respond(HttpStatusCode.Unauthorized)
-        postService
-            .delete(userId, id)
-            .fold(
-                ifLeft = { call.respond(HttpStatusCode.NoContent) },
-                ifRight = { call.respond(HttpStatusCode.NoContent) },
-            )
-      }
+    delete<Posts.ById> { res ->
+      val userId =
+          call.principal<FirebasePrincipal>()?.id
+              ?: return@delete call.respond(HttpStatusCode.Unauthorized)
+      postService
+          .delete(userId, res.id)
+          .fold(
+              ifLeft = { call.respond(HttpStatusCode.NoContent) },
+              ifRight = { call.respond(HttpStatusCode.NoContent) },
+          )
+    }
 
-      put("/{id}/vote") {
-        val id =
-            call.pathParameters["id"]?.toId(::PostId)
-                ?: return@put call.respond(HttpStatusCode.BadRequest)
-        val userId =
-            call.principal<FirebasePrincipal>()?.id
-                ?: return@put call.respond(HttpStatusCode.Unauthorized)
-        val body = call.receive<VoteRequestDto>()
-        val direction = body.type.toDomain()
-        voteService
-            .toggle(userId, VoteTarget.Post(id), direction)
-            .fold(
-                ifLeft = { call.respondError(it, VoteTargetError::toHttp) },
-                ifRight = { call.respond(it.toDto()) },
-            )
-      }
+    put<Posts.ById.Vote> { res ->
+      val userId =
+          call.principal<FirebasePrincipal>()?.id
+              ?: return@put call.respond(HttpStatusCode.Unauthorized)
+      val body = call.receive<VoteRequestDto>()
+      voteService
+          .toggle(userId, VoteTarget.Post(res.parent.id), body.type.toDomain())
+          .fold(
+              ifLeft = { call.respondError(it, VoteTargetError::toHttp) },
+              ifRight = { call.respond(it.toDto()) },
+          )
+    }
 
-      post("/{id}/comments") {
-        val id =
-            call.pathParameters["id"]?.toId(::PostId)
-                ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val userId =
-            call.principal<FirebasePrincipal>()?.id
-                ?: return@post call.respond(HttpStatusCode.Unauthorized)
-        val body = call.receive<CreateCommentRequestDto>()
-        val parentId =
-            body.parentId?.let {
-              it.toId(::CommentId) ?: return@post call.respond(HttpStatusCode.BadRequest)
-            }
-        commentService
-            .create(userId, CommentTarget.Post(id), body.text, parentId)
-            .fold(
-                ifLeft = { call.respondError(it, CreateCommentError::toHttp) },
-                ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
-            )
-      }
+    post<Posts.ById.Comments> { res ->
+      val userId =
+          call.principal<FirebasePrincipal>()?.id
+              ?: return@post call.respond(HttpStatusCode.Unauthorized)
+      val body = call.receive<CreateCommentRequestDto>()
+      val parentId =
+          body.parentId?.let {
+            it.toId(::CommentId) ?: return@post call.respond(HttpStatusCode.BadRequest)
+          }
+      commentService
+          .create(userId, CommentTarget.Post(res.parent.id), body.text, parentId)
+          .fold(
+              ifLeft = { call.respondError(it, CreateCommentError::toHttp) },
+              ifRight = { call.respond(HttpStatusCode.Created, it.toDto()) },
+          )
     }
   }
 }
@@ -334,6 +303,7 @@ fun PostContentValidationError.toHttp() =
       PostContentValidationError.TitleBlank ->
           HttpStatusCode.UnprocessableEntity to
               ApiError(ApiErrorCode.INVALID_INPUT, "The title cannot be empty")
+
       PostContentValidationError.NoContent ->
           HttpStatusCode.UnprocessableEntity to
               ApiError(

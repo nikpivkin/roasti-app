@@ -7,8 +7,9 @@ import dev.roasti.features.users.model.UserPreview
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import kotlinx.serialization.Serializable
 
-@JvmInline @OptIn(ExperimentalUuidApi::class) value class RecipeId(val value: Uuid)
+@OptIn(ExperimentalUuidApi::class) @JvmInline @Serializable value class RecipeId(val value: Uuid)
 
 data class RecipeOriginInfo(val author: UserPreview, val recipeId: RecipeId)
 

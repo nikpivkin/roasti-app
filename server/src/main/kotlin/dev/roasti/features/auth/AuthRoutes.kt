@@ -17,10 +17,9 @@ import dev.roasti.features.auth.usecase.RegisterError
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
+import io.ktor.server.resources.post
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.post
-import io.ktor.server.routing.route
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.koin.ktor.ext.inject
@@ -35,40 +34,38 @@ fun Route.authRoutes() {
   val refreshToken by inject<RefreshToken>()
   val logout by inject<Logout>()
 
-  route("/auth") {
-    post("/register") {
-      val request = call.receive<RegisterRequestDto>()
-      register(request)
-          .fold(
-              ifLeft = { call.respondError(it, RegisterError::toHttp) },
-              ifRight = { call.respond(HttpStatusCode.Created, it) },
-          )
-    }
+  post<Auth.Register> { _ ->
+    val request = call.receive<RegisterRequestDto>()
+    register(request)
+        .fold(
+            ifLeft = { call.respondError(it, RegisterError::toHttp) },
+            ifRight = { call.respond(HttpStatusCode.Created, it) },
+        )
+  }
 
-    post("/login") {
-      val request = call.receive<LoginRequestDto>()
-      login(request.username, request.password)
-          .fold(
-              ifLeft = { call.respondError(it, LoginError::toHttp) },
-              ifRight = { call.respond(it) },
-          )
-    }
+  post<Auth.Login> { _ ->
+    val request = call.receive<LoginRequestDto>()
+    login(request.username, request.password)
+        .fold(
+            ifLeft = { call.respondError(it, LoginError::toHttp) },
+            ifRight = { call.respond(it) },
+        )
+  }
 
-    post("/refresh") {
-      val body = call.receive<RefreshRequestBody>()
-      refreshToken(body.refreshToken)
-          .fold(
-              ifLeft = { call.respondError(it, RefreshError::toHttp) },
-              ifRight = { call.respond(it) },
-          )
-    }
+  post<Auth.Refresh> { _ ->
+    val body = call.receive<RefreshRequestBody>()
+    refreshToken(body.refreshToken)
+        .fold(
+            ifLeft = { call.respondError(it, RefreshError::toHttp) },
+            ifRight = { call.respond(it) },
+        )
+  }
 
-    authenticate(FIREBASE_AUTH) {
-      post("/logout") {
-        val body = call.receive<LogoutRequestBody>()
-        logout(body.refreshToken)
-        call.respond(HttpStatusCode.NoContent)
-      }
+  authenticate(FIREBASE_AUTH) {
+    post<Auth.Logout> { _ ->
+      val body = call.receive<LogoutRequestBody>()
+      logout(body.refreshToken)
+      call.respond(HttpStatusCode.NoContent)
     }
   }
 }
