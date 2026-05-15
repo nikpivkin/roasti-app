@@ -84,6 +84,7 @@ import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
 import io.ktor.server.resources.Resources
 import io.ktor.server.response.respond
+import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import java.io.ByteArrayInputStream
@@ -233,6 +234,7 @@ fun Application.module() {
     }
   }
   routing {
+    get("/health") { call.respond(HttpStatusCode.OK, "OK") }
     route("/api/v1") {
       authRoutes()
       userRoutes()
