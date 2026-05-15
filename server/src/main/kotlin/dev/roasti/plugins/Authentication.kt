@@ -20,6 +20,7 @@ fun Application.configureAuthentication() {
       authenticate { credential ->
         try {
           val decoded = firebaseAuth.verifyIdToken(credential.token)
+          // TODO: test — token without id claim must return 401
           val id = decoded.claims["id"] as? String ?: return@authenticate null
           FirebasePrincipal(UserId(Uuid.parse(id)))
         } catch (_: FirebaseAuthException) {

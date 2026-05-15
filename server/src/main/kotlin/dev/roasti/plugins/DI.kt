@@ -52,60 +52,87 @@ import dev.roasti.features.votes.VoteServiceImpl
 import dev.roasti.features.votes.VoteTargetType
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import org.koin.core.module.Module
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
+
+private val usersModule = module {
+  single<UserRepository> { UserRepositoryImpl() }
+  single { GetCurrentUser(get()) }
+  single { GetUserProfile(get()) }
+  single { UpdateProfile(get(), get()) }
+  single { CheckUsernameAvailability(get()) }
+}
+
+private fun authModule(firebase: FirebaseConfig): Module = module {
+  single<FirebaseSigner> {
+    FirebaseSignerImpl(firebase.apiKey, firebase.identityBaseUrl, firebase.tokenBaseUrl)
+  }
+  single<RevokedTokenRepository> { RevokedTokenRepositoryImpl() }
+  single { FirebaseAuth.getInstance() }
+  single { Register(get(), get(), get()) }
+  single { Login(get(), get()) }
+  single { RefreshToken(get(), get()) }
+  single { Logout(get()) }
+}
+
+private val postsModule = module {
+  single<PostRepository> { PostRepositoryImpl() }
+  single<VoteRepository> { VoteRepositoryImpl() }
+  single<VoteService> {
+    VoteServiceImpl(
+        repo = get(),
+        resolvers = mapOf(VoteTargetType.POST to PostVoteTargetResolver(get())),
+    )
+  }
+  single<PostService> { PostServiceImpl(get(), get(), get(), get(), get()) }
+}
+
+private val recipesModule = module {
+  single<RecipeRepository> { RecipeRepositoryImpl() }
+  single<RecipeService> { RecipeServiceImpl(get(), get(), get()) }
+}
+
+private val likesModule = module {
+  single<LikeRepository> { LikeRepositoryImpl() }
+  single<LikeService> {
+    LikeServiceImpl(
+        repo = get(),
+        resolvers = mapOf(LikeTargetType.RECIPE to RecipeLikeTargetResolver(get())),
+    )
+  }
+}
+
+private val commentsModule = module {
+  single<CommentRepository> { CommentRepositoryImpl() }
+  single<CommentService> {
+    CommentServiceImpl(
+        repo = get(),
+        resolvers =
+            mapOf(
+                CommentTargetType.POST to PostCommentTargetResolver(get()),
+                CommentTargetType.RECIPE to RecipeCommentTargetResolver(get()),
+            ),
+    )
+  }
+}
+
+private fun uploadsModule(uploads: UploadsConfig): Module = module {
+  single<FileStorage> { LocalFileStorage(uploads.dir) }
+  single<UploadRepository> { UploadRepositoryImpl() }
+  single<UploadService> { UploadServiceImpl(get(), get()) }
+}
 
 fun Application.configureDI(firebase: FirebaseConfig, uploads: UploadsConfig) {
   install(Koin) {
     modules(
-        module {
-          single<UserRepository> { UserRepositoryImpl() }
-          single { GetCurrentUser(get()) }
-          single { GetUserProfile(get()) }
-          single { UpdateProfile(get(), get()) }
-          single { CheckUsernameAvailability(get()) }
-          single<FirebaseSigner> {
-            FirebaseSignerImpl(firebase.apiKey, firebase.identityBaseUrl, firebase.tokenBaseUrl)
-          }
-          single<RevokedTokenRepository> { RevokedTokenRepositoryImpl() }
-          single { FirebaseAuth.getInstance() }
-          single<CommentRepository> { CommentRepositoryImpl() }
-          single<PostRepository> { PostRepositoryImpl() }
-          single<LikeRepository> { LikeRepositoryImpl() }
-          single<LikeService> {
-            LikeServiceImpl(
-                repo = get(),
-                resolvers = mapOf(LikeTargetType.RECIPE to RecipeLikeTargetResolver(get())),
-            )
-          }
-          single<VoteRepository> { VoteRepositoryImpl() }
-          single<VoteService> {
-            VoteServiceImpl(
-                repo = get(),
-                resolvers = mapOf(VoteTargetType.POST to PostVoteTargetResolver(get())),
-            )
-          }
-          single<RecipeRepository> { RecipeRepositoryImpl() }
-          single<RecipeService> { RecipeServiceImpl(get(), get(), get()) }
-          single<CommentService> {
-            CommentServiceImpl(
-                repo = get(),
-                resolvers =
-                    mapOf(
-                        CommentTargetType.POST to PostCommentTargetResolver(get()),
-                        CommentTargetType.RECIPE to RecipeCommentTargetResolver(get()),
-                    ),
-            )
-          }
-          single<PostService> { PostServiceImpl(get(), get(), get(), get(), get()) }
-          single<FileStorage> { LocalFileStorage(uploads.dir) }
-          single<UploadRepository> { UploadRepositoryImpl() }
-          single<UploadService> { UploadServiceImpl(get(), get()) }
-          single { Register(get(), get(), get()) }
-          single { Login(get(), get()) }
-          single { RefreshToken(get(), get()) }
-          single { Logout(get()) }
-        }
+        usersModule,
+        authModule(firebase),
+        postsModule,
+        recipesModule,
+        likesModule,
+        commentsModule,
+        uploadsModule(uploads),
     )
   }
 }
