@@ -1,14 +1,16 @@
 package dev.roasti.plugins
 
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthException
 import dev.roasti.FIREBASE_AUTH
 import dev.roasti.FirebasePrincipal
 import dev.roasti.features.users.model.UserId
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import io.ktor.server.application.log
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.bearer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -19,11 +21,14 @@ fun Application.configureAuthentication() {
     bearer(FIREBASE_AUTH) {
       authenticate { credential ->
         try {
-          val decoded = firebaseAuth.verifyIdToken(credential.token)
+          val decoded = withContext(Dispatchers.IO) {
+            firebaseAuth.verifyIdToken(credential.token)
+          }
           // TODO: test — token without id claim must return 401
           val id = decoded.claims["id"] as? String ?: return@authenticate null
           FirebasePrincipal(UserId(Uuid.parse(id)))
-        } catch (_: FirebaseAuthException) {
+        } catch (e: Exception) {
+          application.log.warn("Firebase token verification failed", e)
           null
         }
       }
