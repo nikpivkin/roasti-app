@@ -76,8 +76,7 @@ private fun authModule(firebase: FirebaseConfig): Module = module {
   single { Logout(get()) }
 }
 
-private val postsModule = module {
-  single<PostRepository> { PostRepositoryImpl() }
+private val votesModule = module {
   single<VoteRepository> { VoteRepositoryImpl() }
   single<VoteService> {
     VoteServiceImpl(
@@ -85,6 +84,10 @@ private val postsModule = module {
         resolvers = mapOf(VoteTargetType.POST to PostVoteTargetResolver(get())),
     )
   }
+}
+
+private val postsModule = module {
+  single<PostRepository> { PostRepositoryImpl() }
   single<PostService> { PostServiceImpl(get(), get(), get(), get(), get()) }
 }
 
@@ -128,6 +131,7 @@ fun Application.configureDI(firebase: FirebaseConfig, uploads: UploadsConfig) {
     modules(
         usersModule,
         authModule(firebase),
+        votesModule,
         postsModule,
         recipesModule,
         likesModule,
