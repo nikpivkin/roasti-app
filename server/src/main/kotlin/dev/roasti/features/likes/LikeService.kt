@@ -1,10 +1,14 @@
 package dev.roasti.features.likes
 
+import arrow.core.Either
+import arrow.core.raise.either
+import arrow.core.raise.ensureNotNull
 import dev.roasti.features.users.model.UserId
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 interface LikeService {
-  suspend fun toggle(userId: UserId, targetId: Uuid, targetType: LikeTargetType): LikeInfo
+  suspend fun toggle(userId: UserId, target: LikeTarget): Either<LikeTargetError, LikeInfo>
 
   suspend fun getInfo(userId: UserId?, targetId: Uuid, targetType: LikeTargetType): LikeInfo
 
@@ -15,20 +19,27 @@ interface LikeService {
   ): Map<Uuid, LikeInfo>
 }
 
-class LikeServiceImpl(private val repo: LikeRepository) : LikeService {
+@OptIn(ExperimentalUuidApi::class)
+class LikeServiceImpl(
+    private val repo: LikeRepository,
+    private val resolvers: Map<LikeTargetType, LikeTargetResolver>,
+) : LikeService {
 
   override suspend fun toggle(
       userId: UserId,
-      targetId: Uuid,
-      targetType: LikeTargetType,
-  ): LikeInfo {
-    val exists = repo.exists(userId, targetId, targetType)
+      target: LikeTarget,
+  ): Either<LikeTargetError, LikeInfo> = either {
+    val resolver = ensureNotNull(resolvers[target.type]) { LikeTargetError.NotFound }
+    resolver.resolve(target).bind()
+
+    val targetId = target.targetId
+    val exists = repo.exists(userId, targetId, target.type)
     if (exists) {
-      repo.delete(userId, targetId, targetType)
+      repo.delete(userId, targetId, target.type)
     } else {
-      repo.create(userId, targetId, targetType)
+      repo.create(userId, targetId, target.type)
     }
-    return getInfo(userId, targetId, targetType)
+    getInfo(userId, targetId, target.type)
   }
 
   override suspend fun getInfo(
@@ -53,3 +64,10 @@ class LikeServiceImpl(private val repo: LikeRepository) : LikeService {
     }
   }
 }
+
+@OptIn(ExperimentalUuidApi::class)
+private val LikeTarget.targetId: Uuid
+  get() =
+      when (this) {
+        is LikeTarget.Recipe -> id.value
+      }

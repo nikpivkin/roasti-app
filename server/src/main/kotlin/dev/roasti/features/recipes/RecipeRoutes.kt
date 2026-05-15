@@ -32,6 +32,9 @@ import dev.roasti.features.comments.CreateCommentError
 import dev.roasti.features.comments.toDto
 import dev.roasti.features.comments.toHttp
 import dev.roasti.features.likes.LikeInfo
+import dev.roasti.features.likes.LikeService
+import dev.roasti.features.likes.LikeTarget
+import dev.roasti.features.likes.LikeTargetError
 import dev.roasti.features.users.model.UserId
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
@@ -52,6 +55,7 @@ import org.koin.ktor.ext.inject
 fun Route.recipeRoutes() {
   val recipeService by inject<RecipeService>()
   val commentService by inject<CommentService>()
+  val likeService by inject<LikeService>()
 
   route("/recipes") {
     get {
@@ -140,10 +144,10 @@ fun Route.recipeRoutes() {
             call.pathParameters["id"]?.toId(::RecipeId)
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
         val userId = call.principal<FirebasePrincipal>()!!.id
-        recipeService
-            .toggleLike(userId, id)
+        likeService
+            .toggle(userId, LikeTarget.Recipe(id))
             .fold(
-                ifLeft = { call.respondError(it, ToggleLikeError::toHttp) },
+                ifLeft = { call.respondError(it, LikeTargetError::toHttp) },
                 ifRight = { call.respond(it.toDto()) },
             )
       }
@@ -392,9 +396,9 @@ private fun UpdateRecipeError.toHttp() =
               )
     }
 
-private fun ToggleLikeError.toHttp() =
+private fun LikeTargetError.toHttp() =
     when (this) {
-      ToggleLikeError.RecipeNotFound -> ApiErrors.NotFound
+      LikeTargetError.NotFound -> ApiErrors.NotFound
     }
 
 private fun CloneRecipeError.toHttp() =

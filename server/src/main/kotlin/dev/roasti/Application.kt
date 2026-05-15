@@ -27,6 +27,7 @@ import dev.roasti.features.likes.LikeRepositoryImpl
 import dev.roasti.features.likes.LikeService
 import dev.roasti.features.likes.LikeServiceImpl
 import dev.roasti.features.likes.LikeTable
+import dev.roasti.features.likes.LikeTargetType
 import dev.roasti.features.posts.PostCommentTargetResolver
 import dev.roasti.features.posts.PostRepository
 import dev.roasti.features.posts.PostRepositoryImpl
@@ -37,6 +38,7 @@ import dev.roasti.features.posts.PostVoteTargetResolver
 import dev.roasti.features.posts.postRoutes
 import dev.roasti.features.recipes.BrewStepTable
 import dev.roasti.features.recipes.RecipeCommentTargetResolver
+import dev.roasti.features.recipes.RecipeLikeTargetResolver
 import dev.roasti.features.recipes.RecipeRepository
 import dev.roasti.features.recipes.RecipeRepositoryImpl
 import dev.roasti.features.recipes.RecipeService
@@ -153,7 +155,12 @@ fun Application.module() {
           single<CommentRepository> { CommentRepositoryImpl() }
           single<PostRepository> { PostRepositoryImpl() }
           single<LikeRepository> { LikeRepositoryImpl() }
-          single<LikeService> { LikeServiceImpl(get()) }
+          single<LikeService> {
+            LikeServiceImpl(
+                repo = get(),
+                resolvers = mapOf(LikeTargetType.RECIPE to RecipeLikeTargetResolver(get())),
+            )
+          }
           single<VoteRepository> { VoteRepositoryImpl() }
           single<VoteService> {
             VoteServiceImpl(

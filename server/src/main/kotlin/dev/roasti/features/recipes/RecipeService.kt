@@ -7,7 +7,6 @@ import dev.roasti.common.domain.Page
 import dev.roasti.feature.recipe.domain.model.BrewMethod
 import dev.roasti.feature.recipe.domain.model.Difficulty
 import dev.roasti.feature.recipe.domain.model.RoastLevel
-import dev.roasti.features.likes.LikeInfo
 import dev.roasti.features.likes.LikeService
 import dev.roasti.features.likes.LikeTargetType
 import dev.roasti.features.uploads.UploadService
@@ -35,10 +34,6 @@ sealed interface UpdateRecipeError {
   data class InvalidInput(val error: RecipeValidationError) : UpdateRecipeError
 
   data class ImagesNotUploaded(val ids: List<String>) : UpdateRecipeError
-}
-
-sealed interface ToggleLikeError {
-  data object RecipeNotFound : ToggleLikeError
 }
 
 sealed interface CloneRecipeError {
@@ -83,8 +78,6 @@ interface RecipeService {
   ): Either<UpdateRecipeError, Recipe>
 
   suspend fun delete(userId: UserId, id: RecipeId): Either<DeleteRecipeError, Unit>
-
-  suspend fun toggleLike(userId: UserId, id: RecipeId): Either<ToggleLikeError, LikeInfo>
 
   suspend fun clone(userId: UserId, id: RecipeId): Either<CloneRecipeError, Recipe>
 }
@@ -188,14 +181,6 @@ class RecipeServiceImpl(
         if (existing.author.id != userId) raise(DeleteRecipeError.Forbidden)
         repo.delete(id)
       }
-
-  override suspend fun toggleLike(
-      userId: UserId,
-      id: RecipeId,
-  ): Either<ToggleLikeError, LikeInfo> = either {
-    repo.findById(id) ?: raise(ToggleLikeError.RecipeNotFound)
-    likeService.toggle(userId, id.value, LikeTargetType.RECIPE)
-  }
 
   override suspend fun clone(userId: UserId, id: RecipeId): Either<CloneRecipeError, Recipe> =
       either {
