@@ -20,7 +20,8 @@ fun Application.configureAuthentication() {
       authenticate { credential ->
         try {
           val decoded = firebaseAuth.verifyIdToken(credential.token)
-          FirebasePrincipal(UserId(Uuid.parse(decoded.claims["id"]!! as String)))
+          val id = decoded.claims["id"] as? String ?: return@authenticate null
+          FirebasePrincipal(UserId(Uuid.parse(id)))
         } catch (_: FirebaseAuthException) {
           null
         }
