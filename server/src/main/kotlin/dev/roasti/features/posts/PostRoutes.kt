@@ -57,8 +57,9 @@ fun Route.postRoutes() {
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
         val authorId =
-            call.queryParameters["author_id"]?.toId(::UserId)
-                ?: return@get call.respond(HttpStatusCode.BadRequest)
+            call.queryParameters["author_id"]?.let {
+              it.toId(::UserId) ?: return@get call.respond(HttpStatusCode.BadRequest)
+            }
         val userId = call.principal<FirebasePrincipal>()?.id
         val postsPage = postService.list(page, limit, authorId, userId)
         call.respond(postsPage.toDto())
