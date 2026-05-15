@@ -1,0 +1,101 @@
+- name: Setup
+  hosts: all
+  become: yes
+  vars:
+    app_user: roasti
+    app_dir: /var/lib/roasti
+
+  tasks:
+    - name: Update apt repository
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Create user
+      user:
+        name: "{{ app_user }}"
+        system: yes
+        shell: /bin/bash
+
+    - name: Create directories
+      file:
+        path: "{{ app_dir }}/uploads"
+        state: directory
+        owner: "{{ app_user }}"
+        recurse: yes
+
+    - name: Setup sudoers
+      copy:
+        content: "{{ app_user }} ALL=(ALL) NOPASSWD: ALL\n"
+        dest: "/etc/sudoers.d/{{ app_user }}"
+        mode: '0440'
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Add CI deploy key
+      authorized_key:
+        user: "{{ app_user }}"
+        key: "{{ lookup('file', '~/.ssh/roasti_deploy.pub') }}"
+        state: present
+
+    - name: Install Java 21 JRE
+      ansible.builtin.apt:
+        name: openjdk-21-jre-headless
+        state: present
+
+    - name: Install system packages
+      ansible.builtin.apt:
+        name:
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+          - rsync
+        state: present
+
+    - name: Configure SSH keepalive
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      loop:
+        - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 30' }
+        - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 20' }
+      notify: Restart sshd
+
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Install ufw
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+
+    - name: Set default deny incoming
+      ufw:
+        default: deny
+        direction: incoming
+
+    - name: Allow SSH
+      ufw:
+        rule: allow
+        port: 22
+
+    - name: Allow HTTP
+      ufw:
+        rule: allow
+        port: 80
+
+    - name: Allow HTTPS
+      ufw:
+        rule: allow
+        port: 443
+
+    - name: Enable ufw
+      ufw:
+        state: enabled
+
+  handlers:
+    - name: Restart sshd
+      systemd:
+        name: sshd
+        state: restarted

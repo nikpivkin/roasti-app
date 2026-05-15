@@ -1,0 +1,29 @@
+[Unit]
+Description=Roasti Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=roasti
+Group=roasti
+WorkingDirectory=/var/lib/roasti
+Environment=JAVA_OPTS=-Xms64m -Xmx256m
+ExecStart=/var/lib/roasti/app/bin/server
+EnvironmentFile=/var/lib/roasti/.env
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=60
+StartLimitBurst=5
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=roasti
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/roasti
+
+[Install]
+WantedBy=multi-user.target

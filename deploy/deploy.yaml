@@ -1,0 +1,92 @@
+- name: Deploy
+  hosts: all
+  become: yes
+  become_method: sudo
+  vars:
+    app_user: roasti
+    app_dir: /var/lib/roasti
+    app_install_dir: /var/lib/roasti/app
+    app_port: 8080
+    domain_api: api.roasti.ru
+
+  tasks:
+    - name: Build distribution
+      delegate_to: localhost
+      become: no
+      command: ./gradlew :server:installDist
+      args:
+        chdir: "{{ playbook_dir }}/.."
+
+    - name: Sync distribution
+      synchronize:
+        src: ../server/build/install/server/
+        dest: "{{ app_install_dir }}/"
+        delete: yes
+      become: no
+
+    - name: Copy env file
+      copy:
+        src: ../.env.production
+        dest: "{{ app_dir }}/.env"
+        owner: "{{ app_user }}"
+        mode: '0600'
+
+    - name: Copy service file
+      copy:
+        src: ./roasti.service
+        dest: /etc/systemd/system/{{ app_user }}.service
+
+    - name: Reload systemd and restart service
+      systemd:
+        daemon_reload: yes
+        name: "{{ app_user }}"
+        enabled: yes
+        state: restarted
+
+    - name: Copy nginx config for API
+      copy:
+        dest: /etc/nginx/sites-available/{{ domain_api }}
+        content: |
+          server {
+              listen 80;
+              server_name {{ domain_api }};
+              return 301 https://$host$request_uri;
+          }
+
+          server {
+              listen 443 ssl;
+              server_name {{ domain_api }};
+
+              ssl_certificate /etc/letsencrypt/live/{{ domain_api }}/fullchain.pem;
+              ssl_certificate_key /etc/letsencrypt/live/{{ domain_api }}/privkey.pem;
+
+              location / {
+                  proxy_pass http://localhost:{{ app_port }};
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+
+              client_max_body_size 20m;
+          }
+
+    - name: Enable nginx site
+      file:
+        src: /etc/nginx/sites-available/{{ domain_api }}
+        dest: /etc/nginx/sites-enabled/{{ domain_api }}
+        state: link
+
+    - name: Reload nginx
+      systemd:
+        name: nginx
+        state: reloaded
+
+    - name: Healthcheck
+      uri:
+        url: "http://localhost:{{ app_port }}/api/v1"
+        status_code: [200, 401, 404]
+      retries: 15
+      delay: 3
+      register: result
+      until: result.status in [200, 401, 404]

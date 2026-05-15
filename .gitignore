@@ -30,6 +30,11 @@ secrets.properties
 # Claude Code
 .claude/
 
+# Deploy secrets
+.env.production
+deploy/backup.env
+deploy/deploy.ini
+deploy/setup.ini
 
 # Apk
 composeApp/release/
