@@ -10,7 +10,6 @@ import dev.roasti.features.comments.CommentTargetType
 import dev.roasti.features.recipes.RecipeService
 import dev.roasti.features.uploads.UploadService
 import dev.roasti.features.users.model.UserId
-import dev.roasti.features.votes.VoteDirection
 import dev.roasti.features.votes.VoteInfo
 import dev.roasti.features.votes.VoteService
 import dev.roasti.features.votes.VoteTargetType
@@ -50,10 +49,6 @@ sealed interface DeletePostError {
   data object Forbidden : DeletePostError
 }
 
-sealed interface VotePostError {
-  data object PostNotFound : VotePostError
-}
-
 interface PostService {
   suspend fun getById(postId: PostId, userId: UserId?): Either<GetPostError, Post>
 
@@ -68,12 +63,6 @@ interface PostService {
   ): Either<UpdatePostError, Post>
 
   suspend fun delete(userId: UserId, postId: PostId): Either<DeletePostError, Unit>
-
-  suspend fun vote(
-      userId: UserId,
-      postId: PostId,
-      direction: VoteDirection,
-  ): Either<VotePostError, VoteInfo>
 }
 
 @OptIn(ExperimentalUuidApi::class)
@@ -177,15 +166,6 @@ class PostServiceImpl(
         if (post.author.id != userId) raise(DeletePostError.Forbidden)
         repo.delete(postId)
       }
-
-  override suspend fun vote(
-      userId: UserId,
-      postId: PostId,
-      direction: VoteDirection,
-  ): Either<VotePostError, VoteInfo> = either {
-    repo.findById(postId) ?: raise(VotePostError.PostNotFound)
-    voteService.toggle(userId, postId.value, VoteTargetType.POST, direction)
-  }
 
   private suspend fun PostRow.enrich(userId: UserId?): Post {
     val voteInfo = voteService.getInfo(userId, id.value, VoteTargetType.POST)

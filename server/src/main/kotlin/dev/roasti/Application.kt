@@ -33,6 +33,7 @@ import dev.roasti.features.posts.PostRepositoryImpl
 import dev.roasti.features.posts.PostService
 import dev.roasti.features.posts.PostServiceImpl
 import dev.roasti.features.posts.PostTable
+import dev.roasti.features.posts.PostVoteTargetResolver
 import dev.roasti.features.posts.postRoutes
 import dev.roasti.features.recipes.BrewStepTable
 import dev.roasti.features.recipes.RecipeCommentTargetResolver
@@ -64,6 +65,7 @@ import dev.roasti.features.votes.VoteRepositoryImpl
 import dev.roasti.features.votes.VoteService
 import dev.roasti.features.votes.VoteServiceImpl
 import dev.roasti.features.votes.VoteTable
+import dev.roasti.features.votes.VoteTargetType
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -153,7 +155,12 @@ fun Application.module() {
           single<LikeRepository> { LikeRepositoryImpl() }
           single<LikeService> { LikeServiceImpl(get()) }
           single<VoteRepository> { VoteRepositoryImpl() }
-          single<VoteService> { VoteServiceImpl(get()) }
+          single<VoteService> {
+            VoteServiceImpl(
+                repo = get(),
+                resolvers = mapOf(VoteTargetType.POST to PostVoteTargetResolver(get())),
+            )
+          }
           single<RecipeRepository> { RecipeRepositoryImpl() }
           single<RecipeService> { RecipeServiceImpl(get(), get(), get()) }
           single<CommentService> {

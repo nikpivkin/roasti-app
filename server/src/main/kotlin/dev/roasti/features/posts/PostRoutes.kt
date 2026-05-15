@@ -32,6 +32,9 @@ import dev.roasti.features.users.model.UserId
 import dev.roasti.features.users.model.UserPreview
 import dev.roasti.features.votes.VoteDirection
 import dev.roasti.features.votes.VoteInfo
+import dev.roasti.features.votes.VoteService
+import dev.roasti.features.votes.VoteTarget
+import dev.roasti.features.votes.VoteTargetError
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
@@ -51,6 +54,7 @@ import org.koin.ktor.ext.inject
 fun Route.postRoutes() {
   val postService by inject<PostService>()
   val commentService by inject<CommentService>()
+  val voteService by inject<VoteService>()
 
   route("/posts") {
     authenticate(FIREBASE_AUTH) {
@@ -178,10 +182,10 @@ fun Route.postRoutes() {
                 ?: return@put call.respond(HttpStatusCode.Unauthorized)
         val body = call.receive<VoteRequestDto>()
         val direction = body.type.toDomain()
-        postService
-            .vote(userId, id, direction)
+        voteService
+            .toggle(userId, VoteTarget.Post(id), direction)
             .fold(
-                ifLeft = { call.respondError(it, VotePostError::toHttp) },
+                ifLeft = { call.respondError(it, VoteTargetError::toHttp) },
                 ifRight = { call.respond(it.toDto()) },
             )
       }
@@ -319,9 +323,9 @@ private fun UpdatePostError.toHttp() =
               )
     }
 
-private fun VotePostError.toHttp() =
+private fun VoteTargetError.toHttp() =
     when (this) {
-      VotePostError.PostNotFound ->
+      VoteTargetError.NotFound ->
           HttpStatusCode.NotFound to ApiError(ApiErrorCode.POST_NOT_FOUND, "Post not found")
     }
 

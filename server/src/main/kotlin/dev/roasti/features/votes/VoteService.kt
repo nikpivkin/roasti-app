@@ -1,5 +1,8 @@
 package dev.roasti.features.votes
 
+import arrow.core.Either
+import arrow.core.raise.either
+import arrow.core.raise.ensureNotNull
 import dev.roasti.features.users.model.UserId
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -8,10 +11,9 @@ import kotlin.uuid.Uuid
 interface VoteService {
   suspend fun toggle(
       userId: UserId,
-      targetId: Uuid,
-      targetType: VoteTargetType,
+      target: VoteTarget,
       direction: VoteDirection,
-  ): VoteInfo
+  ): Either<VoteTargetError, VoteInfo>
 
   suspend fun getInfo(userId: UserId?, targetId: Uuid, targetType: VoteTargetType): VoteInfo
 
@@ -23,22 +25,25 @@ interface VoteService {
 }
 
 @OptIn(ExperimentalUuidApi::class)
-class VoteServiceImpl(private val repo: VoteRepository) : VoteService {
+class VoteServiceImpl(
+    private val repo: VoteRepository,
+    private val resolvers: Map<VoteTargetType, VoteTargetResolver>,
+) : VoteService {
   override suspend fun toggle(
       userId: UserId,
-      targetId: Uuid,
-      targetType: VoteTargetType,
+      target: VoteTarget,
       direction: VoteDirection,
-  ): VoteInfo {
+  ): Either<VoteTargetError, VoteInfo> = either {
+    val resolver = ensureNotNull(resolvers[target.type]) { VoteTargetError.NotFound }
+    resolver.resolve(target).bind()
+
     when (direction) {
       VoteDirection.UP,
-      VoteDirection.DOWN -> repo.upsert(userId, targetId, targetType, direction)
+      VoteDirection.DOWN -> repo.upsert(userId, target.targetId, target.type, direction)
 
-      VoteDirection.NONE -> {
-        repo.delete(userId, targetId, targetType)
-      }
+      VoteDirection.NONE -> repo.delete(userId, target.targetId, target.type)
     }
-    return getInfo(userId, targetId, targetType)
+    getInfo(userId, target.targetId, target.type)
   }
 
   override suspend fun getInfo(
@@ -73,3 +78,10 @@ class VoteServiceImpl(private val repo: VoteRepository) : VoteService {
     }
   }
 }
+
+@OptIn(ExperimentalUuidApi::class)
+private val VoteTarget.targetId: Uuid
+  get() =
+      when (this) {
+        is VoteTarget.Post -> id.value
+      }
