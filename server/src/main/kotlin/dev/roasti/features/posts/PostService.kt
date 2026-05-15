@@ -7,6 +7,7 @@ import arrow.core.raise.ensure
 import dev.roasti.common.domain.Page
 import dev.roasti.features.comments.CommentService
 import dev.roasti.features.comments.CommentTargetType
+import dev.roasti.features.recipes.RecipeId
 import dev.roasti.features.recipes.RecipeService
 import dev.roasti.features.uploads.UploadService
 import dev.roasti.features.users.model.UserId
@@ -14,6 +15,8 @@ import dev.roasti.features.votes.VoteInfo
 import dev.roasti.features.votes.VoteService
 import dev.roasti.features.votes.VoteTargetType
 import kotlin.uuid.ExperimentalUuidApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 sealed interface GetPostError {
   data object NotFound : GetPostError
@@ -167,14 +170,32 @@ class PostServiceImpl(
         repo.delete(postId)
       }
 
-  private suspend fun PostRow.enrich(userId: UserId?): Post {
-    val voteInfo = voteService.getInfo(userId, id.value, VoteTargetType.POST)
-    val commentsCount = commentService.countForTarget(id.value, CommentTargetType.POST)
-    val recipeRef =
-        recipeId?.let { rid ->
-          val exists = recipeService.existsByIds(setOf(rid))
-          if (rid in exists) RecipeRef.Available(rid) else RecipeRef.Unavailable(rid)
+  private suspend fun PostRow.enrich(userId: UserId?): Post =
+      listOf(this).enrichAll(userId).single()
+
+  private suspend fun List<PostRow>.enrichAll(userId: UserId?): List<Post> {
+    val ids = map { it.id.value }
+    val recipeIds = mapNotNull { it.recipeId }.toSet()
+
+    val (voteInfos, commentCounts, recipeRefs) =
+        coroutineScope {
+          val v = async { voteService.getInfoBatch(userId, ids, VoteTargetType.POST) }
+          val c = async { commentService.countForTargetBatch(ids, CommentTargetType.POST) }
+          val r = async {
+            if (recipeIds.isEmpty()) emptySet() else recipeService.existsByIds(recipeIds)
+          }
+          Triple(v.await(), c.await(), r.await())
         }
-    return toPost(voteInfo, commentsCount, recipeRef)
+
+    return map {
+      it.toPost(
+          voteInfo = voteInfos.getValue(it.id.value),
+          commentsCount = commentCounts.getValue(it.id.value),
+          recipeRef = it.recipeId?.toRef(recipeRefs),
+      )
+    }
   }
+
+  private fun RecipeId.toRef(existing: Set<RecipeId>): RecipeRef =
+      if (this in existing) RecipeRef.Available(this) else RecipeRef.Unavailable(this)
 }

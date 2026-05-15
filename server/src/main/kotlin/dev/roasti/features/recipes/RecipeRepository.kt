@@ -49,7 +49,7 @@ data class CreateBrewStepInput(
 interface RecipeRepository {
   suspend fun findById(id: RecipeId): RecipeRow?
 
-  suspend fun existsByIds(ids: Collection<Uuid>): Set<Uuid>
+  suspend fun existsByIds(ids: Collection<RecipeId>): Set<RecipeId>
 
   suspend fun list(
       page: Int,
@@ -83,13 +83,13 @@ class RecipeRepositoryImpl : RecipeRepository {
       }
 
   @OptIn(ExperimentalUuidApi::class)
-  override suspend fun existsByIds(ids: Collection<Uuid>): Set<Uuid> =
+  override suspend fun existsByIds(ids: Collection<RecipeId>): Set<RecipeId> =
       withContext(Dispatchers.IO) {
         if (ids.isEmpty()) return@withContext emptySet()
         transaction {
           RecipeTable.select(RecipeTable.id)
-              .where { RecipeTable.id inList ids }
-              .map { it[RecipeTable.id].value }
+              .where { RecipeTable.id inList ids.map { it.value } }
+              .map { RecipeId(it[RecipeTable.id].value) }
               .toSet()
         }
       }

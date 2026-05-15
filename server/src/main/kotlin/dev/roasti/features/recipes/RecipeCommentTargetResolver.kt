@@ -14,7 +14,7 @@ class RecipeCommentTargetResolver(
 
   override suspend fun resolve(
       target: CommentTarget,
-      userId: UserId?,
+      userId: UserId,
   ): Either<TargetError, ResolvedTarget> = either {
     val recipe = target as CommentTarget.Recipe
     val row = repo.findById(recipe.id) ?: raise(TargetError.NotFound)

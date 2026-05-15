@@ -14,7 +14,7 @@ class PostCommentTargetResolver(
 
   override suspend fun resolve(
       target: CommentTarget,
-      userId: UserId?,
+      userId: UserId,
   ): Either<TargetError, ResolvedTarget> = either {
     val post = target as CommentTarget.Post
     repo.findById(post.id) ?: raise(TargetError.NotFound)

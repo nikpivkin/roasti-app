@@ -35,7 +35,7 @@ interface CommentRepository {
 
   suspend fun getAuthorId(id: CommentId): UserId?
 
-  suspend fun update(id: CommentId, text: String)
+  suspend fun update(id: CommentId, text: String): Comment?
 
   suspend fun softDelete(id: CommentId)
 
@@ -97,13 +97,20 @@ class CommentRepositoryImpl : CommentRepository {
         }
       }
 
-  override suspend fun update(id: CommentId, text: String): Unit =
+  override suspend fun update(id: CommentId, text: String): Comment? =
       withContext(Dispatchers.IO) {
         transaction {
-          CommentTable.update({ CommentTable.id eq id.value }) {
-            it[CommentTable.text] = text
-            it[updatedAt] = Clock.System.now()
-          }
+          val updated =
+              CommentTable.update({ CommentTable.id eq id.value }) {
+                it[CommentTable.text] = text
+                it[updatedAt] = Clock.System.now()
+              }
+          if (updated == 0) return@transaction null
+          CommentTable.innerJoin(UserTable)
+              .selectAll()
+              .where { (CommentTable.id eq id.value) and CommentTable.deletedAt.isNull() }
+              .single()
+              .toComment()
         }
       }
 

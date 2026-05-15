@@ -1,9 +1,11 @@
 package dev.roasti.features.posts
 
+import dev.roasti.features.recipes.RecipeId
 import dev.roasti.features.users.UserTable
 import dev.roasti.features.users.model.UserPreview
 import dev.roasti.features.users.toUserPreview
 import dev.roasti.features.votes.VoteInfo
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import org.jetbrains.exposed.v1.core.ReferenceOption
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -28,9 +30,9 @@ data class PostRow(
     val title: String?,
     val text: String?,
     val images: List<String>,
-    val recipeId: kotlin.uuid.Uuid?,
-    val createdAt: kotlin.time.Instant,
-    val updatedAt: kotlin.time.Instant,
+    val recipeId: RecipeId?,
+    val createdAt: Instant,
+    val updatedAt: Instant,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -41,7 +43,7 @@ internal fun ResultRow.toPostRow() =
         title = this[PostTable.title],
         text = this[PostTable.text],
         images = this[PostTable.images],
-        recipeId = this[PostTable.recipeId],
+        recipeId = this[PostTable.recipeId]?.let(::RecipeId),
         createdAt = this[PostTable.createdAt],
         updatedAt = this[PostTable.updatedAt],
     )

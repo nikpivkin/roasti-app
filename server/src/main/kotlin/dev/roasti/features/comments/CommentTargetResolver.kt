@@ -15,5 +15,5 @@ sealed interface TargetError {
 }
 
 interface CommentTargetResolver {
-  suspend fun resolve(target: CommentTarget, userId: UserId?): Either<TargetError, ResolvedTarget>
+  suspend fun resolve(target: CommentTarget, userId: UserId): Either<TargetError, ResolvedTarget>
 }

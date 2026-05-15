@@ -133,8 +133,7 @@ class CommentServiceImpl(
       UpdateCommentError.InvalidInput("comment text must be at most $TEXT_MAX_LENGTH characters")
     }
     // TODO: return comment from update and handle error
-    repo.update(commentId, normalized)
-    repo.findById(commentId)!!
+    repo.update(commentId, normalized) ?: raise(UpdateCommentError.NotFound)
   }
 
   override suspend fun delete(

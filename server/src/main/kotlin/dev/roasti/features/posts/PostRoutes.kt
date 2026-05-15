@@ -243,7 +243,7 @@ private fun Post.toDto() =
         recipe =
             recipeRef?.let {
               PostRecipeRefDto(
-                  id = it.id.toString(),
+                  id = it.id.value.toString(),
                   status =
                       when (it) {
                         is RecipeRef.Available -> PostRecipeStatusDto.AVAILABLE

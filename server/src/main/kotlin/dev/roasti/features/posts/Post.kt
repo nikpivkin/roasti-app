@@ -1,5 +1,6 @@
 package dev.roasti.features.posts
 
+import dev.roasti.features.recipes.RecipeId
 import dev.roasti.features.users.model.UserPreview
 import dev.roasti.features.votes.VoteDirection
 import kotlin.time.Instant
@@ -10,11 +11,11 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 sealed interface RecipeRef {
-  val id: Uuid
+  val id: RecipeId
 
-  data class Available(override val id: Uuid) : RecipeRef
+  data class Available(override val id: RecipeId) : RecipeRef
 
-  data class Unavailable(override val id: Uuid) : RecipeRef
+  data class Unavailable(override val id: RecipeId) : RecipeRef
 }
 
 @OptIn(ExperimentalUuidApi::class)

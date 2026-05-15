@@ -57,24 +57,16 @@ class VoteServiceImpl(
       targetIds: List<Uuid>,
       targetType: VoteTargetType,
   ): Map<Uuid, VoteInfo> {
-
-    // TODO: replace it with fetchRatings + fetchUserVotes
-
-    val rows = repo.getLikes(userId, targetIds, targetType)
-
-    val groupedByTarget = rows.groupBy { it.targetId }
-    val groupedByUser =
-        rows.groupBy { it.targetId }.mapValues { (_, group) -> group.associateBy { it.userId } }
+    if (targetIds.isEmpty()) return emptyMap()
+    val ratings = repo.fetchRatings(targetIds, targetType)
+    val userVotes =
+        if (userId == null) emptyMap() else repo.fetchUserVotes(userId, targetIds, targetType)
 
     return targetIds.associateWith { targetId ->
-      val group = groupedByTarget[targetId] ?: emptyList()
-      val userIndex = groupedByUser[targetId].orEmpty()
-
-      val rating = group.sumOf { it.voteType.score }
-
-      val userVote = userId?.let { id -> userIndex[id]?.voteType } ?: VoteDirection.NONE
-
-      VoteInfo(rating, userVote)
+      VoteInfo(
+          rating = ratings[targetId] ?: 0,
+          userVote = userVotes[targetId] ?: VoteDirection.NONE,
+      )
     }
   }
 }
