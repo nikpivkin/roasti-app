@@ -1,5 +1,6 @@
 package dev.roasti
 
+import dev.roasti.config.loadConfig
 import dev.roasti.features.uploads.UploadService
 import dev.roasti.plugins.configureAuthentication
 import dev.roasti.plugins.configureDI
@@ -21,9 +22,10 @@ import org.koin.ktor.ext.inject
 fun main(args: Array<String>) = io.ktor.server.netty.EngineMain.main(args)
 
 fun Application.module() {
-  configureDatabases()
-  initFirebase()
-  configureDI()
+  val config = loadConfig()
+  configureDatabases(config.database)
+  initFirebase(config.firebase)
+  configureDI(config.firebase, config.uploads)
   configureAuthentication()
   configureLogging()
   configureSerialization()

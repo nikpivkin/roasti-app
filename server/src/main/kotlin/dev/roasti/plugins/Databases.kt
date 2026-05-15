@@ -1,5 +1,6 @@
 package dev.roasti.plugins
 
+import dev.roasti.config.DatabaseConfig
 import dev.roasti.features.auth.RevokedTokenTable
 import dev.roasti.features.comments.CommentTable
 import dev.roasti.features.likes.LikeTable
@@ -14,11 +15,8 @@ import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 
-fun Application.configureDatabases() {
-  val dbUrl = environment.config.property("database.url").getString()
-  val dbDriver = environment.config.property("database.driver").getString()
-
-  Database.connect(url = dbUrl, driver = dbDriver)
+fun Application.configureDatabases(config: DatabaseConfig) {
+  Database.connect(url = config.url, driver = config.driver)
   transaction {
     SchemaUtils.create(
         UserTable,

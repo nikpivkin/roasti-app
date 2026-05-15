@@ -1,6 +1,8 @@
 package dev.roasti.plugins
 
 import com.google.firebase.auth.FirebaseAuth
+import dev.roasti.config.FirebaseConfig
+import dev.roasti.config.UploadsConfig
 import dev.roasti.features.auth.FirebaseSigner
 import dev.roasti.features.auth.FirebaseSignerImpl
 import dev.roasti.features.auth.RevokedTokenRepository
@@ -50,21 +52,10 @@ import dev.roasti.features.votes.VoteServiceImpl
 import dev.roasti.features.votes.VoteTargetType
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import java.io.File
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
 
-fun Application.configureDI() {
-  val uploadsDir =
-      File(environment.config.propertyOrNull("uploads.dir")?.getString() ?: "./uploads")
-  val firebaseApiKey = environment.config.property("firebase.apiKey").getString()
-  val identityBaseUrl =
-      environment.config.propertyOrNull("firebase.identityBaseUrl")?.getString()
-          ?: "https://identitytoolkit.googleapis.com/v1/accounts"
-  val tokenBaseUrl =
-      environment.config.propertyOrNull("firebase.tokenBaseUrl")?.getString()
-          ?: "https://securetoken.googleapis.com/v1/token"
-
+fun Application.configureDI(firebase: FirebaseConfig, uploads: UploadsConfig) {
   install(Koin) {
     modules(
         module {
@@ -74,7 +65,7 @@ fun Application.configureDI() {
           single { UpdateProfile(get(), get()) }
           single { CheckUsernameAvailability(get()) }
           single<FirebaseSigner> {
-            FirebaseSignerImpl(firebaseApiKey, identityBaseUrl, tokenBaseUrl)
+            FirebaseSignerImpl(firebase.apiKey, firebase.identityBaseUrl, firebase.tokenBaseUrl)
           }
           single<RevokedTokenRepository> { RevokedTokenRepositoryImpl() }
           single { FirebaseAuth.getInstance() }
@@ -107,7 +98,7 @@ fun Application.configureDI() {
             )
           }
           single<PostService> { PostServiceImpl(get(), get(), get(), get(), get()) }
-          single<FileStorage> { LocalFileStorage(uploadsDir) }
+          single<FileStorage> { LocalFileStorage(uploads.dir) }
           single<UploadRepository> { UploadRepositoryImpl() }
           single<UploadService> { UploadServiceImpl(get(), get()) }
           single { Register(get(), get(), get()) }
