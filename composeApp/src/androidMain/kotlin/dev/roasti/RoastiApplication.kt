@@ -5,12 +5,12 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import coil3.network.ktor3.KtorNetworkFetcherFactory
+import dev.roasti.core.database.createDatabase
 import io.ktor.client.HttpClient
 import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 import dev.roasti.core.di.commentPagingModule
-import dev.roasti.core.di.coreDatabaseModule
 import dev.roasti.core.di.coreNetworkModule
 import dev.roasti.core.di.postPagingModule
 import dev.roasti.core.di.recipePagingModule
@@ -22,6 +22,12 @@ import dev.roasti.feature.likes.di.likesModule
 import dev.roasti.feature.post.di.postModule
 import dev.roasti.feature.recipe.di.recipeModule
 import dev.roasti.feature.upload.di.uploadModule
+import org.koin.dsl.module
+
+val coreDatabaseModule = module {
+    single<RoastiDatabaseCache> { createDatabase(get()) }
+}
+
 
 @OptIn(ExperimentalCoilApi::class)
 class RoastiApplication : Application() {
