@@ -13,6 +13,11 @@
     <string name="recipe_beans">Beans</string>
     <string name="recipe_brewing_steps">Brewing Steps</string>
     <string name="recipe_roast_level">Roast</string>
+    <string name="recipe_time">Time</string>
+    <string name="recipe_duration_min">%1$d min</string>
+    <string name="recipe_duration_hour">%1$d h</string>
+    <string name="recipe_duration_day">%1$d d</string>
+    <string name="recipe_owner_menu_more">More options</string>
     <string name="recipe_missing_value">N/A</string>
     <string name="recipe_list_favorite_section_title">Favorites</string>
     <string name="recipe_list_favorite_empty_state">You don’t have favorites yet</string>
@@ -43,11 +48,13 @@
     <string name="recipe_roast_level_dark">Dark</string>
     <!-- Create Recipe Screen -->
     <string name="create_recipe_create">Create Recipe</string>
+    <string name="create_recipe_top_bar_title">Create Recipe</string>
     <!-- Edit Recipe -->
     <string name="edit_recipe_save">Save</string>
     <string name="edit_recipe_save_changes">Save Changes</string>
-    <string name="edit_recipe_title_hint">Recipe title…</string>
-    <string name="edit_recipe_description_hint">Describe this recipe…</string>
+    <string name="edit_recipe_top_bar_title">Edit Recipe</string>
+    <string name="edit_recipe_title_hint">Recipe title</string>
+    <string name="edit_recipe_description_hint">Describe this recipe</string>
     <string name="edit_recipe_beans_hint">e.g. Ethiopia Yirgacheffe</string>
     <string name="edit_recipe_add_step">+ Add Step</string>
     <string name="edit_recipe_save_error">Failed to save. Please try again.</string>
@@ -57,15 +64,35 @@
     <string name="edit_recipe_keep_editing">Keep editing</string>
     <string name="edit_recipe_step_add_title">Add Step</string>
     <string name="edit_recipe_step_edit_title">Edit Step</string>
-    <string name="edit_recipe_step_title_label">Title</string>
+    <string name="edit_recipe_step_title_label">Step title</string>
+    <string name="edit_recipe_step_title_hint">e.g. Bloom</string>
     <string name="edit_recipe_step_description_label">Description (optional)</string>
     <string name="edit_recipe_step_duration_min">min</string>
     <string name="edit_recipe_step_duration_sec">sec</string>
     <string name="edit_recipe_step_save">Save Step</string>
+    <string name="edit_recipe_step_duration">Duration</string>
+    <string name="edit_recipe_step_drag_handle">Drag to reorder</string>
+    <string name="edit_recipe_step_delete">Delete step</string>
+    <string name="edit_recipe_required_hint">Fill in required fields</string>
+    <string name="edit_recipe_image_change">Change photo</string>
+    <string name="edit_recipe_image_remove">Remove photo</string>
+    <string name="edit_recipe_step_done">Done</string>
+    <string name="edit_recipe_discard_create_title">Discard recipe?</string>
+    <string name="edit_recipe_discard_create_message">Your new recipe will be lost.</string>
 
     <string name="steps_step_counter">Step %1$d of %2$d</string>
     <string name="steps_brew_ready">Your brew is ready!</string>
     <string name="steps_finish">Finish</string>
+    <string name="steps_finish_brewing">Finish brewing</string>
+    <string name="steps_auto_label">Auto</string>
+    <string name="steps_manual_label">Manual</string>
+    <string name="steps_auto_advancing">Next step in&#8230;</string>
+    <string name="steps_auto_countdown_cancel">Tap to stay</string>
+    <string name="steps_remaining_label">remaining</string>
+    <string name="steps_previous">Previous step</string>
+    <string name="steps_next">Next step</string>
+    <string name="steps_pause">Pause</string>
+    <string name="steps_resume">Resume</string>
 
     <string name="dialog_confirm_title">Confirm action</string>
     <string name="dialog_remove_label">Remove</string>
@@ -121,6 +148,8 @@
     <string name="post_compose_remove_photo">Remove photo</string>
     <string name="post_compose_photo_uploading">Uploading…</string>
     <string name="post_compose_photo_upload_error">Failed to upload photo</string>
+    <string name="post_compose_photos_max_reached">Max %1$d photos per post</string>
+    <string name="post_compose_add_more_photos">Add more</string>
 
     <!-- Post owner actions -->
     <string name="post_media_source_title">Choose photo source</string>
